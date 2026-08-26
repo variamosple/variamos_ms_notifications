@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.stryker-mutator.io/stryker-config.json",
+  "mutate": [
+    "src/Domain/**/*.ts",
+    "src/UseCases/**/*.ts",
+    "!src/Domain/**/*.spec.ts",
+    "!src/UseCases/**/*.spec.ts",
+    "!src/**/*.d.ts"
+  ],
+  "testRunner": "vitest",
+  "checkers": ["typescript"],
+  "tsconfigFile": "tsconfig.json",
+  "vitest": {
+    "configFile": "vitest.config.ts"
+  },
+  "reporters": ["progress", "clear-text", "html"],
+  "concurrency": 2,
+  "incremental": true,
+  "ignoreStatic": true,
+  "coverageAnalysis": "perTest",
+  "thresholds": {
+    "break": 60
+  }
+}

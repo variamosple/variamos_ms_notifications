@@ -1,0 +1,11 @@
+{
+  "src/**/*.ts": [
+    "biome check --write"
+  ],
+  "src/**/*.{js,json}": [
+    "biome check --write"
+  ],
+  "src/**/*.md": [
+    "biome format --write"
+  ]
+}
