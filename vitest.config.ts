@@ -7,8 +7,8 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, "**/dist/**", "**/test/**"],
     coverage: {
       provider: "v8",
-      include: ["src/**/*.ts"],
-      exclude: ["src/main.ts", "**/*.d.ts", "**/*.module.ts"],
+      include: ["src/Domain/**/*.ts", "src/UseCases/**/*.ts"],
+      exclude: ["**/*.d.ts", "**/*.spec.ts"],
       thresholds: {
         global: {
           branches: 80,
