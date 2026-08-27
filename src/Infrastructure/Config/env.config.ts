@@ -7,6 +7,15 @@ const envSchema = z.object({
       required_error: "NOTIFICATION_INTERNAL_TOKEN is required",
     })
     .default("dev-secret-token-12345678"),
+  DATABASE_HOST: z.string().default("localhost"),
+  DATABASE_PORT: z.coerce.number().default(5432),
+  DATABASE_USERNAME: z.string().default("postgres"),
+  DATABASE_PASSWORD: z.string().default("postgres"),
+  DATABASE_NAME: z.string().default("variamos_notifications"),
+  DATABASE_SSL: z
+    .string()
+    .transform((val) => val === "true")
+    .default("false"),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

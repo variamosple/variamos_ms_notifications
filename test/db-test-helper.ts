@@ -9,14 +9,14 @@ export class DbTestHelper {
   private dataSource!: DataSource;
 
   public async start(): Promise<DataSource> {
-    // Démarrage d'un conteneur Postgres officiel léger (v16 alpine)
+    // Start a lightweight official Postgres container (v16-alpine)
     this.container = await new PostgreSqlContainer("postgres:16-alpine")
       .withDatabase("variamos_notifications_test")
       .withUsername("test_user")
       .withPassword("test_password")
       .start();
 
-    // Initialisation du DataSource TypeORM ciblant le conteneur Docker
+    // Initialize TypeORM DataSource targeting the Docker container
     this.dataSource = new DataSource({
       type: "postgres",
       host: this.container.getHost(),
@@ -25,7 +25,7 @@ export class DbTestHelper {
       password: this.container.getPassword(),
       database: this.container.getDatabase(),
       entities: [NotificationEntity, NotificationTemplateEntity, UserPreferencesEntity],
-      synchronize: true, // Crée les tables à partir des entités automatiquement
+      synchronize: true, // Automatically creates tables from entities
     });
 
     await this.dataSource.initialize();
@@ -45,7 +45,7 @@ export class DbTestHelper {
     if (!this.dataSource?.isInitialized) {
       return;
     }
-    // Nettoyer les tables entre chaque test pour isoler les jeux de données
+    // Truncate tables between tests to isolate datasets
     const entities = this.dataSource.entityMetadatas;
     for (const entity of entities) {
       const repository = this.dataSource.getRepository(entity.name);
