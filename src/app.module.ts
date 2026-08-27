@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { NotificationModule } from "./Infrastructure/Modules/notification.module.js";
 import { DatabaseModule } from "./Infrastructure/Persistence/TypeORM/database.module.js";
 import { NotificationEntity } from "./Infrastructure/Persistence/TypeORM/Entities/NotificationEntity.js";
 import { NotificationTemplateEntity } from "./Infrastructure/Persistence/TypeORM/Entities/NotificationTemplateEntity.js";
@@ -28,6 +29,7 @@ import { UserPreferencesEntity } from "./Infrastructure/Persistence/TypeORM/Enti
       },
     }),
     DatabaseModule,
+    NotificationModule,
   ],
   controllers: [],
   providers: [],
