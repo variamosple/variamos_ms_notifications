@@ -6,6 +6,7 @@ import { INotificationChannel } from "../../Domain/Services/INotificationChannel
 import { IUserService } from "../../Domain/Services/IUserService.js";
 import { EmptyTrashUseCase } from "../../UseCases/EmptyTrashUseCase.js";
 import { GetInboxUseCase } from "../../UseCases/GetInboxUseCase.js";
+import { ManagePreferencesUseCase } from "../../UseCases/ManagePreferencesUseCase.js";
 import { MarkAllAsReadUseCase } from "../../UseCases/MarkAllAsReadUseCase.js";
 import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
 import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
@@ -75,6 +76,12 @@ import { NotificationGateway } from "../WebSockets/NotificationGateway.js";
       useFactory: (notificationRepo: INotificationRepository) =>
         new EmptyTrashUseCase(notificationRepo),
       inject: ["INotificationRepository"],
+    },
+    {
+      provide: ManagePreferencesUseCase,
+      useFactory: (preferencesRepo: IUserPreferencesRepository) =>
+        new ManagePreferencesUseCase(preferencesRepo),
+      inject: ["IUserPreferencesRepository"],
     },
   ],
 })

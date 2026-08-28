@@ -14,11 +14,14 @@ import {
 } from "@nestjs/common";
 import { EmptyTrashUseCase } from "../../UseCases/EmptyTrashUseCase.js";
 import { GetInboxUseCase } from "../../UseCases/GetInboxUseCase.js";
+import { ManagePreferencesUseCase } from "../../UseCases/ManagePreferencesUseCase.js";
 import { MarkAllAsReadUseCase } from "../../UseCases/MarkAllAsReadUseCase.js";
 import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
 import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
 import type { SendNotificationDto } from "../DTOs/SendNotificationDto.js";
 import { SendNotificationSchema } from "../DTOs/SendNotificationDto.js";
+import type { UpdatePreferencesDto } from "../DTOs/UpdatePreferencesDto.js";
+import { UpdatePreferencesSchema } from "../DTOs/UpdatePreferencesDto.js";
 import { NotificationInternalGuard } from "../Guards/NotificationInternalGuard.js";
 import { ZodValidationPipe } from "../Pipes/ZodValidationPipe.js";
 
@@ -30,6 +33,7 @@ export class NotificationController {
     private readonly markAsReadUseCase: MarkAsReadUseCase,
     private readonly markAllAsReadUseCase: MarkAllAsReadUseCase,
     private readonly emptyTrashUseCase: EmptyTrashUseCase,
+    private readonly managePreferencesUseCase: ManagePreferencesUseCase,
   ) {}
 
   @Post()
@@ -78,5 +82,19 @@ export class NotificationController {
   @HttpCode(HttpStatus.NO_CONTENT)
   public async emptyTrash(@Query("recipientId") recipientId: string) {
     await this.emptyTrashUseCase.execute(recipientId);
+  }
+
+  @Get("preferences")
+  public async getPreferences(@Query("recipientId") recipientId: string) {
+    return this.managePreferencesUseCase.get(recipientId);
+  }
+
+  @Patch("preferences")
+  @UsePipes(new ZodValidationPipe(UpdatePreferencesSchema))
+  public async updatePreferences(
+    @Query("recipientId") recipientId: string,
+    @Body() dto: UpdatePreferencesDto,
+  ) {
+    return this.managePreferencesUseCase.update(recipientId, dto);
   }
 }
