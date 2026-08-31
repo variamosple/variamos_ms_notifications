@@ -216,5 +216,29 @@ describe("Repositories (Integration)", () => {
       const trashAfter = await notificationRepo.findByRecipient("user-1", 1, 10, "trash");
       expect(trashAfter).toHaveLength(0);
     });
+
+    it("should set deletedAt when deleting a notification", async () => {
+      const notif = new Notification(
+        "60000000-1234-5678-9012-36689f94b8cf",
+        "user-1",
+        null,
+        "key-1",
+        {},
+        {},
+        false,
+        null,
+        new Date(),
+      );
+
+      await notificationRepo.save(notif);
+
+      const foundBefore = await notificationRepo.findById("60000000-1234-5678-9012-36689f94b8cf");
+      expect(foundBefore!.deletedAt).toBeNull();
+
+      await notificationRepo.delete("60000000-1234-5678-9012-36689f94b8cf");
+
+      const foundAfter = await notificationRepo.findById("60000000-1234-5678-9012-36689f94b8cf");
+      expect(foundAfter!.deletedAt).toBeInstanceOf(Date);
+    });
   });
 });

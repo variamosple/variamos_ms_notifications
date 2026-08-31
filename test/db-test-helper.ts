@@ -16,7 +16,20 @@ export class DbTestHelper {
       .withPassword("test_password")
       .start();
 
-    // Initialize TypeORM DataSource targeting the Docker container
+    // Create a temporary connection to create the 'variamos' schema in the fresh test container
+    const setupDataSource = new DataSource({
+      type: "postgres",
+      host: this.container.getHost(),
+      port: this.container.getPort(),
+      username: this.container.getUsername(),
+      password: this.container.getPassword(),
+      database: this.container.getDatabase(),
+    });
+    await setupDataSource.initialize();
+    await setupDataSource.query("CREATE SCHEMA IF NOT EXISTS variamos;");
+    await setupDataSource.destroy();
+
+    // Initialize TypeORM DataSource targeting the 'variamos' schema
     this.dataSource = new DataSource({
       type: "postgres",
       host: this.container.getHost(),
@@ -24,6 +37,7 @@ export class DbTestHelper {
       username: this.container.getUsername(),
       password: this.container.getPassword(),
       database: this.container.getDatabase(),
+      schema: "variamos",
       entities: [NotificationEntity, NotificationTemplateEntity, UserPreferencesEntity],
       synchronize: true, // Automatically creates tables from entities
     });
@@ -48,8 +62,7 @@ export class DbTestHelper {
     // Truncate tables between tests to isolate datasets
     const entities = this.dataSource.entityMetadatas;
     for (const entity of entities) {
-      const repository = this.dataSource.getRepository(entity.name);
-      await repository.query(`TRUNCATE TABLE "${entity.tableName}" CASCADE;`);
+      await this.dataSource.query(`TRUNCATE TABLE "variamos"."${entity.tableName}" CASCADE;`);
     }
   }
 }
