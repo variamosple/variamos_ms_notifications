@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { NotificationModule } from "./Infrastructure/Modules/notification.module.js";
 import { DatabaseModule } from "./Infrastructure/Persistence/TypeORM/database.module.js";
@@ -8,6 +9,7 @@ import { UserPreferencesEntity } from "./Infrastructure/Persistence/TypeORM/Enti
 
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRootAsync({
       useFactory: () => {
         const ssl = process.env.DATABASE_SSL === "true";
@@ -18,6 +20,7 @@ import { UserPreferencesEntity } from "./Infrastructure/Persistence/TypeORM/Enti
           username: process.env.DATABASE_USERNAME || "postgres",
           password: process.env.DATABASE_PASSWORD || "postgres",
           database: process.env.DATABASE_NAME || "variamos_notifications",
+          schema: process.env.DATABASE_SCHEMA || "variamos",
           entities: [
             NotificationEntity,
             NotificationTemplateEntity,
