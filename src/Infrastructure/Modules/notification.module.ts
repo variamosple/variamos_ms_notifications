@@ -4,6 +4,7 @@ import { INotificationTemplateRepository } from "../../Domain/Repositories/INoti
 import { IUserPreferencesRepository } from "../../Domain/Repositories/IUserPreferencesRepository.js";
 import { INotificationChannel } from "../../Domain/Services/INotificationChannel.js";
 import { IUserService } from "../../Domain/Services/IUserService.js";
+import { DeleteNotificationUseCase } from "../../UseCases/DeleteNotificationUseCase.js";
 import { EmptyTrashUseCase } from "../../UseCases/EmptyTrashUseCase.js";
 import { GetInboxUseCase } from "../../UseCases/GetInboxUseCase.js";
 import { ManagePreferencesUseCase } from "../../UseCases/ManagePreferencesUseCase.js";
@@ -75,6 +76,12 @@ import { NotificationGateway } from "../WebSockets/NotificationGateway.js";
       provide: EmptyTrashUseCase,
       useFactory: (notificationRepo: INotificationRepository) =>
         new EmptyTrashUseCase(notificationRepo),
+      inject: ["INotificationRepository"],
+    },
+    {
+      provide: DeleteNotificationUseCase,
+      useFactory: (notificationRepo: INotificationRepository) =>
+        new DeleteNotificationUseCase(notificationRepo),
       inject: ["INotificationRepository"],
     },
     {

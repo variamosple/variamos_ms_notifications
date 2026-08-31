@@ -12,6 +12,7 @@ import {
   UseGuards,
   UsePipes,
 } from "@nestjs/common";
+import { DeleteNotificationUseCase } from "../../UseCases/DeleteNotificationUseCase.js";
 import { EmptyTrashUseCase } from "../../UseCases/EmptyTrashUseCase.js";
 import { GetInboxUseCase } from "../../UseCases/GetInboxUseCase.js";
 import { ManagePreferencesUseCase } from "../../UseCases/ManagePreferencesUseCase.js";
@@ -33,6 +34,7 @@ export class NotificationController {
     private readonly markAsReadUseCase: MarkAsReadUseCase,
     private readonly markAllAsReadUseCase: MarkAllAsReadUseCase,
     private readonly emptyTrashUseCase: EmptyTrashUseCase,
+    private readonly deleteNotificationUseCase: DeleteNotificationUseCase,
     private readonly managePreferencesUseCase: ManagePreferencesUseCase,
   ) {}
 
@@ -82,6 +84,12 @@ export class NotificationController {
   @HttpCode(HttpStatus.NO_CONTENT)
   public async emptyTrash(@Query("recipientId") recipientId: string) {
     await this.emptyTrashUseCase.execute(recipientId);
+  }
+
+  @Delete(":id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  public async delete(@Param("id") id: string) {
+    await this.deleteNotificationUseCase.execute(id);
   }
 
   @Get("preferences")
