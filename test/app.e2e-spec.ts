@@ -25,6 +25,7 @@ describe("AppModule (e2e)", () => {
   beforeAll(async () => {
     dbHelper = new DbTestHelper();
     dataSource = await dbHelper.start();
+    await dataSource.query("CREATE SCHEMA IF NOT EXISTS variamos;");
 
     process.env.DATABASE_HOST = (dataSource.options as PostgresOptions).host;
     process.env.DATABASE_PORT = String((dataSource.options as PostgresOptions).port);
@@ -112,6 +113,39 @@ describe("AppModule (e2e)", () => {
 
       expect(response.body).toHaveLength(1);
       expect(response.body[0].recipientId).toBe("user-1");
+    });
+
+    it("DELETE /notifications/:id should move the notification to trash", async () => {
+      // 1. Create a notification
+      const createResponse = await request(app.getHttpServer())
+        .post("/notifications")
+        .set("x-internal-token", internalToken)
+        .send({
+          recipients: { userIds: ["user-1"] },
+          templateKey: "test_template",
+          variables: { name: "Nathan" },
+        })
+        .expect(HttpStatus.CREATED);
+
+      const notifId = createResponse.body[0].id;
+
+      // 2. Delete it
+      await request(app.getHttpServer())
+        .delete(`/notifications/${notifId}`)
+        .expect(HttpStatus.NO_CONTENT);
+
+      // 3. Verify it is no longer in inbox
+      const inboxResponse = await request(app.getHttpServer())
+        .get("/notifications?recipientId=user-1&page=1&limit=5&folder=inbox")
+        .expect(HttpStatus.OK);
+      expect(inboxResponse.body).toHaveLength(0);
+
+      // 4. Verify it is in trash
+      const trashResponse = await request(app.getHttpServer())
+        .get("/notifications?recipientId=user-1&page=1&limit=5&folder=trash")
+        .expect(HttpStatus.OK);
+      expect(trashResponse.body).toHaveLength(1);
+      expect(trashResponse.body[0].id).toBe(notifId);
     });
   });
 

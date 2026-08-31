@@ -13,4 +13,5 @@ export interface INotificationRepository {
   countUnread(recipientId: string): Promise<number>;
   markAllAsRead(recipientId: string): Promise<void>;
   emptyTrash(recipientId: string): Promise<void>;
+  delete(id: string): Promise<void>;
 }

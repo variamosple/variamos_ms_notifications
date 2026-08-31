@@ -1,98 +1,181 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# VariaMos Notifications Microservice
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS microservice to store and dispatch notifications in real-time (REST + WebSockets) for the VariaMos platform.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## Overview
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ npm install
+```mermaid
+graph TD
+  Client[Frontend Client] -- WebSocket Connection --> WSGateway[NotificationGateway]
+  Client -- HTTP Request --> Controller[NotificationController]
+  MSAdmin[Other Microservice e.g. Admin] -- HTTP POST /notifications --> Controller
+  Controller -- Calls --> UseCases[Use Cases]
+  UseCases -- Persists --> DB[PostgreSQL Database]
+  UseCases -- Triggers Real-Time Broadcast --> WSGateway
+  WSGateway -- Emits notification event --> Client
 ```
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ npm run start
+## Configuration
 
-# watch mode
-$ npm run start:dev
+Set these variables in your local `.env` file:
 
-# production mode
-$ npm run start:prod
+```env
+PORT=3000
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_USERNAME=variamos_user
+DATABASE_PASSWORD=variamos_password
+DATABASE_NAME=variamos_notifications
+DATABASE_SSL=false
+NOTIFICATION_INTERNAL_TOKEN=your-shared-secret-token
 ```
 
-## Run tests
+---
 
-```bash
-# unit tests
-$ npm run test
+## HTTP REST API
 
-# e2e tests
-$ npm run test:e2e
+All routes are prefixed with `/notifications`.
 
-# test coverage
-$ npm run test:cov
+### 1. Send a notification (internal call)
+*   **POST** `/`
+*   **Headers:** `x-internal-token: <NOTIFICATION_INTERNAL_TOKEN>`
+*   **Body (JSON):**
+    ```json
+    {
+      "recipients": {
+        "userIds": ["user-uuid-1"],
+        "roles": ["administrator"]
+      },
+      "templateKey": "review_assigned",
+      "variables": { "languageName": "French" },
+      "metadata": { "tag": "linguistics" },
+      "actorId": "user-uuid-actor"
+    }
+    ```
+*   **Recipient Targeting Logic:**
+    *   **Specific Users:** Pass an array of user UUIDs in `recipients.userIds`.
+    *   **By Role:** Pass an array of role names in `recipients.roles` (the service will fetch and resolve all user IDs belonging to these roles).
+    *   **Deduplication:** You can mix both `userIds` and `roles`. The service automatically deduplicates recipients to ensure no user receives the same notification twice.
+    *   **Broadcast:** To broadcast to all users, target the general system role that includes all registered users (e.g. `member` or `user`).
+*   **Response:** `201 Created`
+
+### Get notifications
+*   **GET** `/`
+*   **Query params:**
+    *   `recipientId` (required): User UUID
+    *   `folder` (optional): `"inbox"` (default) or `"trash"`
+    *   `page` (optional): default `1`
+    *   `limit` (optional): default `10`
+
+### Mark a notification as read
+*   **PATCH** `/:id/read`
+*   **Response:** `200 OK`
+
+### Mark all as read
+*   **PATCH** `/read-all?recipientId=<user-uuid>`
+*   **Response:** `204 No Content`
+
+### Empty trash
+*   **DELETE** `/trash?recipientId=<user-uuid>`
+*   **Response:** `204 No Content`
+
+### Get preferences
+*   **GET** `/preferences?recipientId=<user-uuid>`
+
+### Update preferences
+*   **PATCH** `/preferences?recipientId=<user-uuid>`
+*   **Body (JSON):**
+    ```json
+    {
+      "emailEnabled": true,
+      "inAppEnabled": false,
+      "mutedEventTypes": ["project_created"]
+    }
+    ```
+
+---
+
+## WebSockets
+
+Clients connect using Socket.io to receive real-time notifications.
+
+*   **URL:** `ws://localhost:3000`
+*   **Handshake:** Pass the `userId` in the handshake (auth or query params):
+    ```javascript
+    import { io } from "socket.io-client";
+    const socket = io("http://localhost:3000", {
+      query: { userId: "user-uuid-1" }
+    });
+    ```
+*   **Event:** Listen to the `"notification"` event:
+    ```javascript
+    socket.on("notification", (data) => {
+      console.log("Received notification:", data);
+    });
+    ```
+
+---
+
+## Client Microservice Integration
+
+Add these variables to your microservice's `.env` configuration:
+```env
+NOTIFICATION_SERVICE_URL=http://localhost:3000
+NOTIFICATION_INTERNAL_TOKEN=your-shared-secret-token
 ```
 
-## Deployment
+### TypeScript client snippet:
+```typescript
+import axios from "axios";
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+export class NotificationClient {
+  private readonly url = process.env.NOTIFICATION_SERVICE_URL;
+  private readonly token = process.env.NOTIFICATION_INTERNAL_TOKEN;
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+  public async sendNotification(payload: {
+    recipients: { userIds?: string[]; roles?: string[] };
+    templateKey: string;
+    variables?: Record<string, any>;
+    metadata?: Record<string, any>;
+    actorId?: string | null;
+  }): Promise<void> {
+    if (!this.url || !this.token) return;
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+    await axios.post(`${this.url}/notifications`, payload, {
+      headers: {
+        "x-internal-token": this.token,
+        "Content-Type": "application/json",
+      },
+    });
+  }
+}
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Resources
+## Local Development
 
-Check out a few resources that may come in handy when working with NestJS:
+### 1. Database
+Configure your database credentials in `.env`.
+*Hint: Run Postgres in Docker with the default credentials matching the .env above:*
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```bash
+docker run --name variamos-postgres -e POSTGRES_USER=variamos_user -e POSTGRES_PASSWORD=variamos_password -e POSTGRES_DB=variamos_notifications -p 5432:5432 -d postgres
+```
 
-## Support
+### 2. Run the app
+```bash
+npm install
+npm run start:dev
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+### 3. Tests
+```bash
+npm run test      # Unit tests
+npm run test:e2e  # Integration & E2E (uses Docker Testcontainers)
+npm run lint      # Biome formatting
+```

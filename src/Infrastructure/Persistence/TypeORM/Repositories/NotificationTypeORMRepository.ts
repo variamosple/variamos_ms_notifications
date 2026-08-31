@@ -78,4 +78,8 @@ export class NotificationTypeORMRepository implements INotificationRepository {
       deletedAt: Not(IsNull()),
     });
   }
+
+  public async delete(id: string): Promise<void> {
+    await this.repository.update({ id }, { deletedAt: new Date() });
+  }
 }

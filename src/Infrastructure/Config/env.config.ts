@@ -12,6 +12,7 @@ const envSchema = z.object({
   DATABASE_USERNAME: z.string().default("postgres"),
   DATABASE_PASSWORD: z.string().default("postgres"),
   DATABASE_NAME: z.string().default("variamos_notifications"),
+  DATABASE_SCHEMA: z.string().default("variamos"),
   DATABASE_SSL: z
     .string()
     .transform((val) => val === "true")
