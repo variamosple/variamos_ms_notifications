@@ -12,9 +12,15 @@ describe("ZodValidationPipe", () => {
   const pipe = new ZodValidationPipe(schema);
 
   it("should return parsed value if validation succeeds", () => {
-    const input = { username: "nathan", age: 25 };
+    const input = { username: "john_doe", age: 25 };
     const result = pipe.transform(input);
     expect(result).toEqual(input);
+  });
+
+  it("should parse stringified JSON input and validate successfully", () => {
+    const input = JSON.stringify({ username: "john_doe", age: 25 });
+    const result = pipe.transform(input);
+    expect(result).toEqual({ username: "john_doe", age: 25 });
   });
 
   it("should throw BadRequestException if validation fails", () => {
