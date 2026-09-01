@@ -98,10 +98,10 @@ export class NotificationController {
   }
 
   @Patch("preferences")
-  @UsePipes(new ZodValidationPipe(UpdatePreferencesSchema))
   public async updatePreferences(
     @Query("recipientId") recipientId: string,
-    @Body() dto: UpdatePreferencesDto,
+    @Body(new ZodValidationPipe(UpdatePreferencesSchema))
+    dto: UpdatePreferencesDto,
   ) {
     return this.managePreferencesUseCase.update(recipientId, dto);
   }

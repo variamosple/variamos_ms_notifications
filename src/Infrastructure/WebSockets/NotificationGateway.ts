@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -16,6 +17,8 @@ import { INotificationChannel } from "../../Domain/Services/INotificationChannel
 export class NotificationGateway
   implements INotificationChannel, OnGatewayConnection, OnGatewayDisconnect
 {
+  private readonly logger = new Logger(NotificationGateway.name);
+
   @WebSocketServer()
   private readonly server!: Server;
 
@@ -46,6 +49,9 @@ export class NotificationGateway
   public handleConnection(client: Socket): void {
     const userId = this.extractUserId(client);
     if (!userId) {
+      this.logger.warn(
+        `Rejected socket connection without userId: ${client.id}`,
+      );
       client.disconnect(true);
       return;
     }
@@ -58,6 +64,7 @@ export class NotificationGateway
       this.activeConnections.set(userId, userSockets);
     }
     userSockets.add(client.id);
+    this.logger.log(`User connected: userId=${userId}, socketId=${client.id}`);
   }
 
   public handleDisconnect(client: Socket): void {
@@ -73,12 +80,17 @@ export class NotificationGateway
         this.activeConnections.delete(userId);
       }
     }
+    this.logger.log(
+      `User disconnected: userId=${userId}, socketId=${client.id}`,
+    );
   }
 
   private extractUserId(client: Socket): string | null {
     // Support retrieving userId from handshake auth object or query params
-    const userId =
-      client.handshake.auth?.userId || client.handshake.query?.userId;
-    return typeof userId === "string" && userId.trim() !== "" ? userId : null;
+    let raw = client.handshake.auth?.userId || client.handshake.query?.userId;
+    if (Array.isArray(raw)) {
+      raw = raw[0];
+    }
+    return typeof raw === "string" && raw.trim() !== "" ? raw.trim() : null;
   }
 }
