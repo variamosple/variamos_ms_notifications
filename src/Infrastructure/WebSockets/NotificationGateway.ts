@@ -2,6 +2,7 @@ import { Logger } from "@nestjs/common";
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   WebSocketGateway,
   WebSocketServer,
 } from "@nestjs/websockets";
@@ -15,12 +16,20 @@ import { INotificationChannel } from "../../Domain/Services/INotificationChannel
   },
 })
 export class NotificationGateway
-  implements INotificationChannel, OnGatewayConnection, OnGatewayDisconnect
+  implements
+    INotificationChannel,
+    OnGatewayInit,
+    OnGatewayConnection,
+    OnGatewayDisconnect
 {
   private readonly logger = new Logger(NotificationGateway.name);
 
   @WebSocketServer()
   private readonly server!: Server;
+
+  public afterInit(server: Server): void {
+    this.logger.log("NotificationGateway initialized and listening for WebSocket events");
+  }
 
   // Map userId to a Set of socket IDs to support multiple active tabs per user
   private readonly activeConnections = new Map<string, Set<string>>();
