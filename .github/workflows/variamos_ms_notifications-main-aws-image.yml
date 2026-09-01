@@ -41,9 +41,10 @@ jobs:
           key: ${{ secrets.VARIAMOS_AWS_PEM }}
           script: |
             echo "Injecting GitHub Secrets into environment..."
-            sed -i -E '/^(VARIAMOS_MS_NOTIFICATIONS_PORT|VARIAMOS_MS_NOTIFICATIONS_INTERNAL_PORT)=/d' .env.aws.develop
+            sed -i -E '/^(VARIAMOS_MS_NOTIFICATIONS_PORT|VARIAMOS_MS_NOTIFICATIONS_INTERNAL_PORT|NOTIFICATION_INTERNAL_TOKEN)=/d' .env.aws.develop
             echo "VARIAMOS_MS_NOTIFICATIONS_PORT=\"${{ vars.VARIAMOS_MS_NOTIFICATIONS_PORT }}\"" >> .env.aws.develop
             echo "VARIAMOS_MS_NOTIFICATIONS_INTERNAL_PORT=\"${{ vars.VARIAMOS_MS_NOTIFICATIONS_INTERNAL_PORT }}\"" >> .env.aws.develop
+            echo "NOTIFICATION_INTERNAL_TOKEN=\"${{ secrets.NOTIFICATION_INTERNAL_TOKEN }}\"" >> .env.aws.develop
 
             echo "Executing command on remote server..."
             docker compose --env-file .env.aws.develop -f docker-compose-aws-develop-nginx.yml pull variamos_ms_notifications
