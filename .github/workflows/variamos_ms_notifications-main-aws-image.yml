@@ -48,5 +48,5 @@ jobs:
 
             echo "Executing command on remote server..."
             docker compose --env-file .env.aws.develop -f docker-compose-aws-develop-nginx.yml pull variamos_ms_notifications
-            docker compose --env-file .env.aws.develop -f docker-compose-aws-develop-nginx.yml up -d variamos_ms_notifications
+            docker compose --env-file .env.aws.develop -f docker-compose-aws-develop-nginx.yml up -d --force-recreate variamos_ms_notifications
             docker image prune -f

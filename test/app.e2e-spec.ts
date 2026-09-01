@@ -160,9 +160,12 @@ describe("AppModule (e2e)", () => {
         query: { userId: "user-ws-1" },
       });
 
+      const connected = new Promise<void>((resolve) => {
+        wsClient.on("connect", () => resolve());
+      });
       wsClient.connect();
+      await connected;
 
-      // Wait for WS client to connect and receive event
       const notificationReceived = new Promise<any>((resolve) => {
         wsClient.on("notification", (data) => {
           resolve(data);
@@ -184,6 +187,45 @@ describe("AppModule (e2e)", () => {
       expect(receivedPayload).toBeDefined();
       expect(receivedPayload.templateKey).toBe("test_template");
       expect(receivedPayload.variables).toEqual({ name: "WS Tester" });
+
+      wsClient.disconnect();
+    });
+
+    it("should dispatch notification when client connects with /variamos_ms_notifications namespace", async () => {
+      await app.listen(0);
+      const serverUrl = await app.getUrl();
+
+      const wsClient: Socket = io(`${serverUrl}/variamos_ms_notifications`, {
+        autoConnect: false,
+        query: { userId: "user-ws-2" },
+      });
+
+      const connected = new Promise<void>((resolve) => {
+        wsClient.on("connect", () => resolve());
+      });
+      wsClient.connect();
+      await connected;
+
+      const notificationReceived = new Promise<any>((resolve) => {
+        wsClient.on("notification", (data) => {
+          resolve(data);
+        });
+      });
+
+      await request(app.getHttpServer())
+        .post("/notifications")
+        .set("x-internal-token", internalToken)
+        .send({
+          recipients: { userIds: ["user-ws-2"] },
+          templateKey: "test_template",
+          variables: { name: "Namespace Tester" },
+        })
+        .expect(HttpStatus.CREATED);
+
+      const receivedPayload = await notificationReceived;
+      expect(receivedPayload).toBeDefined();
+      expect(receivedPayload.templateKey).toBe("test_template");
+      expect(receivedPayload.variables).toEqual({ name: "Namespace Tester" });
 
       wsClient.disconnect();
     });

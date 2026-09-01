@@ -14,12 +14,16 @@ import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.
 import { NotificationController } from "../Controllers/NotificationController.js";
 import { DatabaseModule } from "../Persistence/TypeORM/database.module.js";
 import { UserServiceHttpClient } from "../Services/UserServiceHttpClient.js";
-import { NotificationGateway } from "../WebSockets/NotificationGateway.js";
+import {
+  NotificationGateway,
+  RootNotificationGateway,
+} from "../WebSockets/NotificationGateway.js";
 
 @Module({
   imports: [DatabaseModule],
   controllers: [NotificationController],
   providers: [
+    RootNotificationGateway,
     NotificationGateway,
     {
       provide: "INotificationChannel",
