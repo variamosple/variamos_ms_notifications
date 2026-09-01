@@ -23,17 +23,22 @@ export class NotificationGateway
   private readonly activeConnections = new Map<string, Set<string>>();
 
   public async send(notification: Notification): Promise<void> {
+    const payload = {
+      id: notification.id,
+      templateKey: notification.templateKey,
+      variables: notification.variables,
+      metadata: notification.metadata,
+      isRead: notification.isRead,
+      createdAt: notification.createdAt,
+    };
+
+    // Emit to room userId (and directly to tracked sockets)
+    this.server.to(notification.recipientId).emit("notification", payload);
+
     const socketIds = this.activeConnections.get(notification.recipientId);
     if (socketIds && socketIds.size > 0) {
       for (const socketId of socketIds) {
-        this.server.to(socketId).emit("notification", {
-          id: notification.id,
-          templateKey: notification.templateKey,
-          variables: notification.variables,
-          metadata: notification.metadata,
-          isRead: notification.isRead,
-          createdAt: notification.createdAt,
-        });
+        this.server.to(socketId).emit("notification", payload);
       }
     }
   }
@@ -44,6 +49,8 @@ export class NotificationGateway
       client.disconnect(true);
       return;
     }
+
+    client.join(userId);
 
     let userSockets = this.activeConnections.get(userId);
     if (!userSockets) {
