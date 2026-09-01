@@ -27,8 +27,10 @@ export class NotificationGateway
   @WebSocketServer()
   private readonly server!: Server;
 
-  public afterInit(server: Server): void {
-    this.logger.log("NotificationGateway initialized and listening for WebSocket events");
+  public afterInit(_server: Server): void {
+    this.logger.log(
+      "NotificationGateway initialized and listening for WebSocket events",
+    );
   }
 
   // Map userId to a Set of socket IDs to support multiple active tabs per user
