@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { HealthController } from "./Infrastructure/Controllers/HealthController.js";
 import { NotificationModule } from "./Infrastructure/Modules/notification.module.js";
 import { DatabaseModule } from "./Infrastructure/Persistence/TypeORM/database.module.js";
 import { NotificationEntity } from "./Infrastructure/Persistence/TypeORM/Entities/NotificationEntity.js";
@@ -34,7 +35,7 @@ import { UserPreferencesEntity } from "./Infrastructure/Persistence/TypeORM/Enti
     DatabaseModule,
     NotificationModule,
   ],
-  controllers: [],
+  controllers: [HealthController],
   providers: [],
 })
 export class AppModule {}
