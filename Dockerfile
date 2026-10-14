@@ -2,7 +2,7 @@ FROM node:24-alpine
 
 WORKDIR /service
 
-COPY package.json package-lock.json tsconfig.json nest-cli.json ./
+COPY package.json package-lock.json tsconfig.json tsconfig.build.json nest-cli.json ./
 COPY src ./src
 
 RUN npm ci
