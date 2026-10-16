@@ -3,8 +3,10 @@ import { Controller, Get, HttpStatus, Res } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import type { Response } from "express";
 import { DataSource } from "typeorm";
+import { SkipUserAccessCheck } from "../Auth/SkipUserAccessCheck.js";
 
 @Controller("health")
+@SkipUserAccessCheck()
 export class HealthController {
   private readonly startTime = Date.now();
 
