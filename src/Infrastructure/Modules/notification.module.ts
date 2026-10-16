@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { INotificationRepository } from "../../Domain/Repositories/INotificationRepository.js";
 import { INotificationTemplateRepository } from "../../Domain/Repositories/INotificationTemplateRepository.js";
 import { IUserPreferencesRepository } from "../../Domain/Repositories/IUserPreferencesRepository.js";
@@ -18,6 +19,10 @@ import {
 } from "../Auth/AccessControlMode.js";
 import { AccessTokenVerifier } from "../Auth/AccessTokenVerifier.js";
 import { UserAccessGuard } from "../Auth/UserAccessGuard.js";
+import {
+  RATE_LIMIT,
+  UserAwareThrottlerGuard,
+} from "../Auth/UserAwareThrottlerGuard.js";
 import { NotificationController } from "../Controllers/NotificationController.js";
 import { DatabaseModule } from "../Persistence/TypeORM/database.module.js";
 import { UserServiceHttpClient } from "../Services/UserServiceHttpClient.js";
@@ -27,7 +32,7 @@ import {
 } from "../WebSockets/NotificationGateway.js";
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, ThrottlerModule.forRoot([RATE_LIMIT])],
   controllers: [NotificationController],
   providers: [
     AccessTokenVerifier,
@@ -35,6 +40,8 @@ import {
     // Every HTTP route checks the user access token, unless it is marked
     // with @SkipUserAccessCheck() (ADR-0001)
     { provide: APP_GUARD, useClass: UserAccessGuard },
+    // After UserAccessGuard: the limit is per user when a token is present
+    { provide: APP_GUARD, useClass: UserAwareThrottlerGuard },
     RootNotificationGateway,
     NotificationGateway,
     {

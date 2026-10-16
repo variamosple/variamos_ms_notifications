@@ -1,5 +1,6 @@
 import os from "node:os";
 import { Controller, Get, HttpStatus, Res } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import { InjectDataSource } from "@nestjs/typeorm";
 import type { Response } from "express";
 import { DataSource } from "typeorm";
@@ -7,6 +8,7 @@ import { SkipUserAccessCheck } from "../Auth/SkipUserAccessCheck.js";
 
 @Controller("health")
 @SkipUserAccessCheck()
+@SkipThrottle()
 export class HealthController {
   private readonly startTime = Date.now();
 

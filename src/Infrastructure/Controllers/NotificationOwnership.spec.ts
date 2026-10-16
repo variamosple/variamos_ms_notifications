@@ -78,6 +78,10 @@ class InMemoryPreferences implements IUserPreferencesRepository {
   }
 }
 
+const A1 = "aaaaaaaa-1111-4111-8111-111111111111";
+const B1 = "bbbbbbbb-1111-4111-8111-111111111111";
+const MISSING = "cccccccc-1111-4111-8111-111111111111";
+
 const notificationOf = (id: string, recipientId: string) =>
   new Notification(
     id,
@@ -154,8 +158,8 @@ describe("Notification ownership with an access token", () => {
     notifications.rows.clear();
     preferences.rows.clear();
     await notifications.saveMany([
-      notificationOf("a-1", "user-a"),
-      notificationOf("b-1", "user-b"),
+      notificationOf(A1, "user-a"),
+      notificationOf(B1, "user-b"),
     ]);
   });
 
@@ -164,35 +168,35 @@ describe("Notification ownership with an access token", () => {
       http().get("/notifications?recipientId=user-b"),
     ).expect(HttpStatus.OK);
 
-    expect(response.body.map((n: { id: string }) => n.id)).toEqual(["a-1"]);
+    expect(response.body.map((n: { id: string }) => n.id)).toEqual([A1]);
   });
 
   it("answers 404 when marking another user's notification as read", async () => {
-    await asUserA(http().patch("/notifications/b-1/read")).expect(
+    await asUserA(http().patch(`/notifications/${B1}/read`)).expect(
       HttpStatus.NOT_FOUND,
     );
 
-    expect(notifications.rows.get("b-1")?.isRead).toBe(false);
+    expect(notifications.rows.get(B1)?.isRead).toBe(false);
   });
 
   it("marks the token user's own notification as read", async () => {
-    await asUserA(http().patch("/notifications/a-1/read")).expect(
+    await asUserA(http().patch(`/notifications/${A1}/read`)).expect(
       HttpStatus.OK,
     );
 
-    expect(notifications.rows.get("a-1")?.isRead).toBe(true);
+    expect(notifications.rows.get(A1)?.isRead).toBe(true);
   });
 
   it("answers 404 when deleting another user's notification", async () => {
-    await asUserA(http().delete("/notifications/b-1")).expect(
+    await asUserA(http().delete(`/notifications/${B1}`)).expect(
       HttpStatus.NOT_FOUND,
     );
 
-    expect(notifications.rows.get("b-1")?.deletedAt).toBeNull();
+    expect(notifications.rows.get(B1)?.deletedAt).toBeNull();
   });
 
   it("answers 404, not 500, for a notification that does not exist", async () => {
-    await asUserA(http().patch("/notifications/missing/read")).expect(
+    await asUserA(http().patch(`/notifications/${MISSING}/read`)).expect(
       HttpStatus.NOT_FOUND,
     );
   });
@@ -202,8 +206,8 @@ describe("Notification ownership with an access token", () => {
       http().patch("/notifications/read-all?recipientId=user-b"),
     ).expect(HttpStatus.NO_CONTENT);
 
-    expect(notifications.rows.get("a-1")?.isRead).toBe(true);
-    expect(notifications.rows.get("b-1")?.isRead).toBe(false);
+    expect(notifications.rows.get(A1)?.isRead).toBe(true);
+    expect(notifications.rows.get(B1)?.isRead).toBe(false);
   });
 
   it("updates only the token user's preferences", async () => {
@@ -223,7 +227,7 @@ describe("Notification ownership with an access token", () => {
         .get("/notifications?recipientId=user-b")
         .expect(HttpStatus.OK);
 
-      expect(response.body.map((n: { id: string }) => n.id)).toEqual(["b-1"]);
+      expect(response.body.map((n: { id: string }) => n.id)).toEqual([B1]);
     });
 
     it.each([
@@ -240,8 +244,8 @@ describe("Notification ownership with an access token", () => {
             : http().delete(url);
 
       await pending.expect(HttpStatus.BAD_REQUEST);
-      expect(notifications.rows.get("a-1")?.isRead).toBe(false);
-      expect(notifications.rows.get("b-1")?.isRead).toBe(false);
+      expect(notifications.rows.get(A1)?.isRead).toBe(false);
+      expect(notifications.rows.get(B1)?.isRead).toBe(false);
     });
   });
 });
