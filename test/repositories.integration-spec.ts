@@ -281,4 +281,36 @@ describe("Repositories (Integration)", () => {
       );
     });
   });
+
+  describe("NotificationRepository pagination (TST-NOTIF-13)", () => {
+    it("pages 25 notifications by 10, newest first", async () => {
+      const base = new Date("2026-10-01T00:00:00Z").getTime();
+      await notificationRepo.saveMany(
+        Array.from({ length: 25 }, (_, i) =>
+          new Notification(
+            `${String(i).padStart(8, "0")}-1234-4678-9012-36689f94b8cf`,
+            "user-p",
+            null,
+            "key-1",
+            {},
+            {},
+            false,
+            null,
+            new Date(base + i * 60_000),
+          ),
+        ),
+      );
+
+      const pages = await Promise.all(
+        [1, 2, 3].map((page) =>
+          notificationRepo.findByRecipient("user-p", page, 10, "inbox"),
+        ),
+      );
+
+      expect(pages.map((p) => p.length)).toEqual([10, 10, 5]);
+      const times = pages.flat().map((n) => n.createdAt.getTime());
+      expect(times).toEqual([...times].sort((a, b) => b - a));
+      expect(new Set(pages.flat().map((n) => n.id)).size).toBe(25);
+    });
+  });
 });

@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -13,6 +14,7 @@ import {
   UseGuards,
   UsePipes,
 } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import type { Principal } from "../../Domain/Entities/Principal.js";
 import { DeleteNotificationUseCase } from "../../UseCases/DeleteNotificationUseCase.js";
 import { EmptyTrashUseCase } from "../../UseCases/EmptyTrashUseCase.js";
@@ -23,12 +25,19 @@ import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
 import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
 import { CurrentPrincipal } from "../Auth/CurrentPrincipal.js";
 import { SkipUserAccessCheck } from "../Auth/SkipUserAccessCheck.js";
+import {
+  type InboxQuery,
+  InboxQuerySchema,
+  type RecipientQuery,
+  RecipientQuerySchema,
+} from "../DTOs/QueryDtos.js";
 import type { SendNotificationDto } from "../DTOs/SendNotificationDto.js";
 import { SendNotificationSchema } from "../DTOs/SendNotificationDto.js";
 import type { UpdatePreferencesDto } from "../DTOs/UpdatePreferencesDto.js";
 import { UpdatePreferencesSchema } from "../DTOs/UpdatePreferencesDto.js";
 import { DomainErrorFilter } from "../Filters/DomainErrorFilter.js";
 import { NotificationInternalGuard } from "../Guards/NotificationInternalGuard.js";
+import { ZodQueryPipe } from "../Pipes/ZodQueryPipe.js";
 import { ZodValidationPipe } from "../Pipes/ZodValidationPipe.js";
 
 /**
@@ -58,6 +67,7 @@ export class NotificationController {
 
   @Post()
   @SkipUserAccessCheck()
+  @SkipThrottle()
   @UseGuards(NotificationInternalGuard)
   @UsePipes(new ZodValidationPipe(SendNotificationSchema))
   @HttpCode(HttpStatus.CREATED)
@@ -74,25 +84,20 @@ export class NotificationController {
   @Get()
   public async getInbox(
     @CurrentPrincipal() principal: Principal | undefined,
-    @Query("recipientId") recipientId: string,
-    @Query("page") page = "1",
-    @Query("limit") limit = "10",
-    @Query("folder") folder: "inbox" | "trash" = "inbox",
+    @Query(new ZodQueryPipe(InboxQuerySchema)) query: InboxQuery,
   ) {
-    const pageNum = Number.parseInt(page, 10) || 1;
-    const limitNum = Number.parseInt(limit, 10) || 10;
     return this.getInboxUseCase.execute({
-      recipientId: recipientOf(principal, recipientId) as string,
-      page: pageNum,
-      limit: limitNum,
-      folder,
+      recipientId: recipientOf(principal, query.recipientId) as string,
+      page: query.page,
+      limit: query.limit,
+      folder: query.folder,
     });
   }
 
   @Patch(":id/read")
   public async markAsRead(
     @CurrentPrincipal() principal: Principal | undefined,
-    @Param("id") id: string,
+    @Param("id", new ParseUUIDPipe()) id: string,
   ) {
     return this.markAsReadUseCase.execute(id, principal);
   }
@@ -101,10 +106,10 @@ export class NotificationController {
   @HttpCode(HttpStatus.NO_CONTENT)
   public async markAllAsRead(
     @CurrentPrincipal() principal: Principal | undefined,
-    @Query("recipientId") recipientId: string,
+    @Query(new ZodQueryPipe(RecipientQuerySchema)) query: RecipientQuery,
   ) {
     await this.markAllAsReadUseCase.execute(
-      recipientOf(principal, recipientId) as string,
+      recipientOf(principal, query.recipientId) as string,
     );
   }
 
@@ -112,10 +117,10 @@ export class NotificationController {
   @HttpCode(HttpStatus.NO_CONTENT)
   public async emptyTrash(
     @CurrentPrincipal() principal: Principal | undefined,
-    @Query("recipientId") recipientId: string,
+    @Query(new ZodQueryPipe(RecipientQuerySchema)) query: RecipientQuery,
   ) {
     await this.emptyTrashUseCase.execute(
-      recipientOf(principal, recipientId) as string,
+      recipientOf(principal, query.recipientId) as string,
     );
   }
 
@@ -123,7 +128,7 @@ export class NotificationController {
   @HttpCode(HttpStatus.NO_CONTENT)
   public async delete(
     @CurrentPrincipal() principal: Principal | undefined,
-    @Param("id") id: string,
+    @Param("id", new ParseUUIDPipe()) id: string,
   ) {
     await this.deleteNotificationUseCase.execute(id, principal);
   }
@@ -131,22 +136,22 @@ export class NotificationController {
   @Get("preferences")
   public async getPreferences(
     @CurrentPrincipal() principal: Principal | undefined,
-    @Query("recipientId") recipientId: string,
+    @Query(new ZodQueryPipe(RecipientQuerySchema)) query: RecipientQuery,
   ) {
     return this.managePreferencesUseCase.get(
-      recipientOf(principal, recipientId) as string,
+      recipientOf(principal, query.recipientId) as string,
     );
   }
 
   @Patch("preferences")
   public async updatePreferences(
     @CurrentPrincipal() principal: Principal | undefined,
-    @Query("recipientId") recipientId: string,
+    @Query(new ZodQueryPipe(RecipientQuerySchema)) query: RecipientQuery,
     @Body(new ZodValidationPipe(UpdatePreferencesSchema))
     dto: UpdatePreferencesDto,
   ) {
     return this.managePreferencesUseCase.update(
-      recipientOf(principal, recipientId) as string,
+      recipientOf(principal, query.recipientId) as string,
       dto,
     );
   }

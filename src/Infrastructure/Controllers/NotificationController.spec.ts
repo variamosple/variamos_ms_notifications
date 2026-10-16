@@ -25,6 +25,7 @@ import { NotificationController } from "./NotificationController.js";
  * `asUser`, so adding a user token later changes one place only.
  */
 const INTERNAL_TOKEN = "test-internal-token";
+const N1 = "11111111-1111-4111-8111-111111111111";
 
 const useCases = {
   send: { execute: vi.fn() },
@@ -120,6 +121,25 @@ describe("NotificationController HTTP contract", () => {
         { ...body, recipients: { userIds: [], roles: [] } },
       ],
       ["an empty template key", { ...body, templateKey: "" }],
+      ["a too long template key", { ...body, templateKey: "k".repeat(101) }],
+      ["an empty user id", { ...body, recipients: { userIds: [""] } }],
+      [
+        "variables nested too deeply",
+        { ...body, variables: { a: { b: { c: { d: { e: { f: 1 } } } } } } },
+      ],
+      [
+        "a too long variable",
+        { ...body, variables: { text: "x".repeat(10_001) } },
+      ],
+      [
+        "too many metadata keys",
+        {
+          ...body,
+          metadata: Object.fromEntries(
+            Array.from({ length: 51 }, (_, i) => [`k${i}`, i]),
+          ),
+        },
+      ],
       [
         "role recipients",
         { ...body, recipients: { roles: ["administrator"] } },
@@ -176,15 +196,29 @@ describe("NotificationController HTTP contract", () => {
       });
     });
 
-    it("falls back to the defaults for non-numeric page and limit", async () => {
+    it.each([
+      ["a non-numeric page", "page=abc"],
+      ["a negative page", "page=-1"],
+      ["a limit above 100", "limit=1000000"],
+      ["a zero limit", "limit=0"],
+      ["an unknown folder", "folder=foo"],
+    ])("answers 400 for %s", async (_label, params) => {
+      await asUser(
+        http().get(`/notifications?recipientId=user-1&${params}`),
+      ).expect(HttpStatus.BAD_REQUEST);
+
+      expect(useCases.inbox.execute).not.toHaveBeenCalled();
+    });
+
+    it("accepts the largest page size", async () => {
       useCases.inbox.execute.mockResolvedValue({ data: [], total: 0 });
 
       await asUser(
-        http().get("/notifications?recipientId=user-1&page=abc&limit=xyz"),
+        http().get("/notifications?recipientId=user-1&limit=100"),
       ).expect(HttpStatus.OK);
 
       expect(useCases.inbox.execute).toHaveBeenCalledWith(
-        expect.objectContaining({ page: 1, limit: 10 }),
+        expect.objectContaining({ limit: 100 }),
       );
     });
   });
@@ -192,19 +226,16 @@ describe("NotificationController HTTP contract", () => {
   describe("PATCH /notifications/:id/read", () => {
     it("marks the notification as read and returns the use case result", async () => {
       useCases.markAsRead.execute.mockResolvedValue({
-        id: "n-1",
+        id: N1,
         isRead: true,
       });
 
       const response = await asUser(
-        http().patch("/notifications/n-1/read"),
+        http().patch(`/notifications/${N1}/read`),
       ).expect(HttpStatus.OK);
 
-      expect(response.body).toEqual({ id: "n-1", isRead: true });
-      expect(useCases.markAsRead.execute).toHaveBeenCalledWith(
-        "n-1",
-        undefined,
-      );
+      expect(response.body).toEqual({ id: N1, isRead: true });
+      expect(useCases.markAsRead.execute).toHaveBeenCalledWith(N1, undefined);
     });
   });
 
@@ -230,13 +261,29 @@ describe("NotificationController HTTP contract", () => {
     });
   });
 
+  describe("notification id", () => {
+    it.each(["PATCH", "DELETE"])(
+      "%s answers 400 for an id that is not a UUID",
+      async (method) => {
+        const pending =
+          method === "PATCH"
+            ? http().patch("/notifications/not-a-uuid/read")
+            : http().delete("/notifications/not-a-uuid");
+
+        await asUser(pending).expect(HttpStatus.BAD_REQUEST);
+        expect(useCases.markAsRead.execute).not.toHaveBeenCalled();
+        expect(useCases.delete.execute).not.toHaveBeenCalled();
+      },
+    );
+  });
+
   describe("DELETE /notifications/:id", () => {
     it("answers 204 and deletes the notification", async () => {
-      await asUser(http().delete("/notifications/n-1")).expect(
+      await asUser(http().delete(`/notifications/${N1}`)).expect(
         HttpStatus.NO_CONTENT,
       );
 
-      expect(useCases.delete.execute).toHaveBeenCalledWith("n-1", undefined);
+      expect(useCases.delete.execute).toHaveBeenCalledWith(N1, undefined);
     });
   });
 
