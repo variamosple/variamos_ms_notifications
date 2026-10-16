@@ -1,13 +1,20 @@
 import { Notification } from "../Domain/Entities/Notification.js";
+import type { Principal } from "../Domain/Entities/Principal.js";
+import { NotificationNotFoundError } from "../Domain/Errors/NotificationErrors.js";
 import { INotificationRepository } from "../Domain/Repositories/INotificationRepository.js";
 
 export class MarkAsReadUseCase {
   constructor(private readonly notificationRepo: INotificationRepository) {}
 
-  public async execute(id: string): Promise<Notification> {
+  /**
+   * With an actor, only the actor's own notification can be marked; any
+   * other one answers "not found". Without one (observe mode, ADR-0001),
+   * the previous behaviour is kept.
+   */
+  public async execute(id: string, actor?: Principal): Promise<Notification> {
     const notification = await this.notificationRepo.findById(id);
-    if (!notification) {
-      throw new Error(`Notification with ID '${id}' not found`);
+    if (!notification || (actor && !notification.belongsTo(actor.userId))) {
+      throw new NotificationNotFoundError(id);
     }
 
     notification.markAsRead();

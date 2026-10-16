@@ -241,4 +241,44 @@ describe("Repositories (Integration)", () => {
       expect(foundAfter!.deletedAt).toBeInstanceOf(Date);
     });
   });
+
+  describe("NotificationRepository scope (CA-NT-01)", () => {
+    const unread = (id: string, recipientId: string) =>
+      new Notification(id, recipientId, null, "key-1", {}, {}, false, null, new Date());
+
+    beforeEach(async () => {
+      await notificationRepo.saveMany([
+        unread("a1000000-1234-5678-9012-36689f94b8cf", "user-a"),
+        unread("b1000000-1234-5678-9012-36689f94b8cf", "user-b"),
+      ]);
+    });
+
+    it("marks only the given recipient's notifications as read", async () => {
+      await notificationRepo.markAllAsRead("user-a");
+
+      expect(await notificationRepo.countUnread("user-a")).toBe(0);
+      expect(await notificationRepo.countUnread("user-b")).toBe(1);
+    });
+
+    it.each(["", undefined])(
+      "refuses to mark all as read without recipient (%j) and touches no row",
+      async (recipientId) => {
+        await expect(
+          notificationRepo.markAllAsRead(recipientId as unknown as string),
+        ).rejects.toThrow("A recipient is required.");
+
+        expect(await notificationRepo.countUnread("user-a")).toBe(1);
+        expect(await notificationRepo.countUnread("user-b")).toBe(1);
+      },
+    );
+
+    it("refuses to list or empty the trash without recipient", async () => {
+      await expect(
+        notificationRepo.findByRecipient("", 1, 10, "inbox"),
+      ).rejects.toThrow("A recipient is required.");
+      await expect(notificationRepo.emptyTrash("")).rejects.toThrow(
+        "A recipient is required.",
+      );
+    });
+  });
 });

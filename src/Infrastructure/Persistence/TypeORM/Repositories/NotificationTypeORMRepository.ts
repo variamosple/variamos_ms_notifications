@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { IsNull, Not, Repository } from "typeorm";
 import { Notification } from "../../../../Domain/Entities/Notification.js";
+import { requireRecipient } from "../../../../Domain/Errors/NotificationErrors.js";
 import { INotificationRepository } from "../../../../Domain/Repositories/INotificationRepository.js";
 import { NotificationEntity } from "../Entities/NotificationEntity.js";
 import * as NotificationMapper from "../Mappers/NotificationMapper.js";
@@ -43,6 +44,8 @@ export class NotificationTypeORMRepository implements INotificationRepository {
     limit: number,
     folder: "inbox" | "trash",
   ): Promise<Notification[]> {
+    // A query without recipient would read every user's notifications
+    requireRecipient(recipientId);
     const entities = await this.repository.find({
       where: {
         recipientId,
@@ -56,6 +59,7 @@ export class NotificationTypeORMRepository implements INotificationRepository {
   }
 
   public async countUnread(recipientId: string): Promise<number> {
+    requireRecipient(recipientId);
     return this.repository.count({
       where: {
         recipientId,
@@ -66,6 +70,9 @@ export class NotificationTypeORMRepository implements INotificationRepository {
   }
 
   public async markAllAsRead(recipientId: string): Promise<void> {
+    // TypeORM drops an undefined criterion: without this check the update
+    // could touch every user's rows (CA-NT-01)
+    requireRecipient(recipientId);
     await this.repository.update(
       { recipientId, isRead: false, deletedAt: IsNull() },
       { isRead: true, readAt: new Date() },
@@ -73,6 +80,7 @@ export class NotificationTypeORMRepository implements INotificationRepository {
   }
 
   public async emptyTrash(recipientId: string): Promise<void> {
+    requireRecipient(recipientId);
     await this.repository.delete({
       recipientId,
       deletedAt: Not(IsNull()),

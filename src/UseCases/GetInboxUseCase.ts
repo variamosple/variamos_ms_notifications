@@ -1,4 +1,5 @@
 import { Notification } from "../Domain/Entities/Notification.js";
+import { requireRecipient } from "../Domain/Errors/NotificationErrors.js";
 import { INotificationRepository } from "../Domain/Repositories/INotificationRepository.js";
 
 export interface GetInboxInput {
@@ -13,7 +14,7 @@ export class GetInboxUseCase {
 
   public async execute(input: GetInboxInput): Promise<Notification[]> {
     return this.notificationRepo.findByRecipient(
-      input.recipientId,
+      requireRecipient(input.recipientId),
       input.page,
       input.limit,
       input.folder,

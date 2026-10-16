@@ -190,7 +190,10 @@ describe("NotificationController HTTP contract", () => {
       ).expect(HttpStatus.OK);
 
       expect(response.body).toEqual({ id: "n-1", isRead: true });
-      expect(useCases.markAsRead.execute).toHaveBeenCalledWith("n-1");
+      expect(useCases.markAsRead.execute).toHaveBeenCalledWith(
+        "n-1",
+        undefined,
+      );
     });
   });
 
@@ -222,7 +225,7 @@ describe("NotificationController HTTP contract", () => {
         HttpStatus.NO_CONTENT,
       );
 
-      expect(useCases.delete.execute).toHaveBeenCalledWith("n-1");
+      expect(useCases.delete.execute).toHaveBeenCalledWith("n-1", undefined);
     });
   });
 
