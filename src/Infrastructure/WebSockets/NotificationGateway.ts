@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -9,6 +9,11 @@ import {
 import { Server, Socket } from "socket.io";
 import { Notification } from "../../Domain/Entities/Notification.js";
 import { INotificationChannel } from "../../Domain/Services/INotificationChannel.js";
+import {
+  ACCESS_CONTROL_MODE_TOKEN,
+  type AccessControlMode,
+} from "../Auth/AccessControlMode.js";
+import { AccessTokenVerifier } from "../Auth/AccessTokenVerifier.js";
 
 function extractUserId(client: Socket): string | null {
   let raw = client.handshake.auth?.userId || client.handshake.query?.userId;
@@ -16,6 +21,32 @@ function extractUserId(client: Socket): string | null {
     raw = raw[0];
   }
   return typeof raw === "string" && raw.trim() !== "" ? raw.trim() : null;
+}
+
+/**
+ * Room to join for a connecting client: the user of a valid access token
+ * (`handshake.auth.token`). Without one, "observe" mode keeps the userId the
+ * client gives, and "enforce" mode refuses the connection (null).
+ */
+async function resolveRoom(
+  client: Socket,
+  verifier: AccessTokenVerifier,
+  mode: AccessControlMode,
+  logger: Logger,
+): Promise<string | null> {
+  const token = client.handshake.auth?.token;
+  const principal = await verifier.verify(
+    typeof token === "string" ? token : null,
+  );
+  if (principal) return principal.userId;
+  if (mode === "enforce") return null;
+  const userId = extractUserId(client);
+  if (userId) {
+    logger.warn(
+      `Observe mode: socket ${client.id} connected without a valid access token`,
+    );
+  }
+  return userId;
 }
 
 @Injectable()
@@ -32,6 +63,12 @@ export class RootNotificationGateway
   @WebSocketServer()
   private readonly server!: Server;
 
+  constructor(
+    private readonly verifier: AccessTokenVerifier,
+    @Inject(ACCESS_CONTROL_MODE_TOKEN)
+    private readonly mode: AccessControlMode,
+  ) {}
+
   public afterInit(_server: Server): void {
     this.logger.log("RootNotificationGateway (namespace: /) initialized");
   }
@@ -42,11 +79,16 @@ export class RootNotificationGateway
     }
   }
 
-  public handleConnection(client: Socket): void {
-    const userId = extractUserId(client);
+  public async handleConnection(client: Socket): Promise<void> {
+    const userId = await resolveRoom(
+      client,
+      this.verifier,
+      this.mode,
+      this.logger,
+    );
     if (!userId) {
       this.logger.warn(
-        `Rejected root socket connection without userId: ${client.id}`,
+        `Rejected root socket connection without a valid user: ${client.id}`,
       );
       client.disconnect(true);
       return;
@@ -87,7 +129,12 @@ export class NotificationGateway
   @WebSocketServer()
   private readonly server!: Server;
 
-  constructor(private readonly rootGateway: RootNotificationGateway) {}
+  constructor(
+    private readonly rootGateway: RootNotificationGateway,
+    private readonly verifier: AccessTokenVerifier,
+    @Inject(ACCESS_CONTROL_MODE_TOKEN)
+    private readonly mode: AccessControlMode,
+  ) {}
 
   public afterInit(_server: Server): void {
     this.logger.log(
@@ -112,11 +159,16 @@ export class NotificationGateway
     this.rootGateway.send(notification, payload);
   }
 
-  public handleConnection(client: Socket): void {
-    const userId = extractUserId(client);
+  public async handleConnection(client: Socket): Promise<void> {
+    const userId = await resolveRoom(
+      client,
+      this.verifier,
+      this.mode,
+      this.logger,
+    );
     if (!userId) {
       this.logger.warn(
-        `Rejected namespace socket connection without userId: ${client.id}`,
+        `Rejected namespace socket connection without a valid user: ${client.id}`,
       );
       client.disconnect(true);
       return;

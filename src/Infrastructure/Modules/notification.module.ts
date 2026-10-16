@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
 import { INotificationRepository } from "../../Domain/Repositories/INotificationRepository.js";
 import { INotificationTemplateRepository } from "../../Domain/Repositories/INotificationTemplateRepository.js";
 import { IUserPreferencesRepository } from "../../Domain/Repositories/IUserPreferencesRepository.js";
@@ -11,6 +12,12 @@ import { ManagePreferencesUseCase } from "../../UseCases/ManagePreferencesUseCas
 import { MarkAllAsReadUseCase } from "../../UseCases/MarkAllAsReadUseCase.js";
 import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
 import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
+import {
+  ACCESS_CONTROL_MODE,
+  ACCESS_CONTROL_MODE_TOKEN,
+} from "../Auth/AccessControlMode.js";
+import { AccessTokenVerifier } from "../Auth/AccessTokenVerifier.js";
+import { UserAccessGuard } from "../Auth/UserAccessGuard.js";
 import { NotificationController } from "../Controllers/NotificationController.js";
 import { DatabaseModule } from "../Persistence/TypeORM/database.module.js";
 import { UserServiceHttpClient } from "../Services/UserServiceHttpClient.js";
@@ -23,6 +30,11 @@ import {
   imports: [DatabaseModule],
   controllers: [NotificationController],
   providers: [
+    AccessTokenVerifier,
+    { provide: ACCESS_CONTROL_MODE_TOKEN, useValue: ACCESS_CONTROL_MODE },
+    // Every HTTP route checks the user access token, unless it is marked
+    // with @SkipUserAccessCheck() (ADR-0001)
+    { provide: APP_GUARD, useClass: UserAccessGuard },
     RootNotificationGateway,
     NotificationGateway,
     {

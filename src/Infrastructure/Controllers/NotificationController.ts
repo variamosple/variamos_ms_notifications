@@ -19,6 +19,7 @@ import { ManagePreferencesUseCase } from "../../UseCases/ManagePreferencesUseCas
 import { MarkAllAsReadUseCase } from "../../UseCases/MarkAllAsReadUseCase.js";
 import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
 import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
+import { SkipUserAccessCheck } from "../Auth/SkipUserAccessCheck.js";
 import type { SendNotificationDto } from "../DTOs/SendNotificationDto.js";
 import { SendNotificationSchema } from "../DTOs/SendNotificationDto.js";
 import type { UpdatePreferencesDto } from "../DTOs/UpdatePreferencesDto.js";
@@ -39,6 +40,7 @@ export class NotificationController {
   ) {}
 
   @Post()
+  @SkipUserAccessCheck()
   @UseGuards(NotificationInternalGuard)
   @UsePipes(new ZodValidationPipe(SendNotificationSchema))
   @HttpCode(HttpStatus.CREATED)
