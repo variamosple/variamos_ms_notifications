@@ -70,8 +70,9 @@ export class NotificationTypeORMRepository implements INotificationRepository {
   }
 
   public async markAllAsRead(recipientId: string): Promise<void> {
-    // TypeORM drops an undefined criterion: without this check the update
-    // could touch every user's rows (CA-NT-01)
+    // TypeORM 0.3 dropped an undefined criterion, so the update could touch
+    // every user's rows (CA-NT-01). TypeORM 1 throws instead; this check
+    // keeps the domain error and its 400 answer
     requireRecipient(recipientId);
     await this.repository.update(
       { recipientId, isRead: false, deletedAt: IsNull() },
