@@ -19,15 +19,17 @@ export const SendNotificationSchema = z.object({
       userIds: z.array(z.string()).optional(),
       roles: z.array(z.string()).optional(),
     })
-    .refine(
-      (data) =>
-        (data.userIds && data.userIds.length > 0) ||
-        (data.roles && data.roles.length > 0),
-      {
-        message: "At least one recipient (userIds or roles) must be provided",
-        path: ["userIds"],
-      },
-    ),
+    .refine((data) => !data.roles || data.roles.length === 0, {
+      // The admin service resolves roles into user ids before sending
+      // (EV-99, CA-NT-02, option a); this service cannot resolve them.
+      message:
+        "Role recipients are not supported: resolve them into userIds before sending",
+      path: ["roles"],
+    })
+    .refine((data) => data.userIds && data.userIds.length > 0, {
+      message: "At least one recipient in userIds must be provided",
+      path: ["userIds"],
+    }),
   templateKey: z.string().min(1),
   variables: z.record(JsonSchema).default({}),
   metadata: z.record(JsonSchema).default({}),
