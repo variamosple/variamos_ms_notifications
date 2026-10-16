@@ -14,6 +14,10 @@ export class Notification {
     public deletedAt: Date | null = null,
   ) {}
 
+  public belongsTo(userId: string): boolean {
+    return this.recipientId === userId;
+  }
+
   public markAsRead(): void {
     if (!this.isRead) {
       this.isRead = true;

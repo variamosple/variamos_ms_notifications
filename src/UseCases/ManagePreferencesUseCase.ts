@@ -1,4 +1,5 @@
 import { UserPreferences } from "../Domain/Entities/UserPreferences.js";
+import { requireRecipient } from "../Domain/Errors/NotificationErrors.js";
 import { IUserPreferencesRepository } from "../Domain/Repositories/IUserPreferencesRepository.js";
 
 export interface UpdatePreferencesInput {
@@ -11,6 +12,7 @@ export class ManagePreferencesUseCase {
   constructor(private readonly preferencesRepo: IUserPreferencesRepository) {}
 
   public async get(userId: string): Promise<UserPreferences> {
+    requireRecipient(userId);
     const preferences = await this.preferencesRepo.findByUserId(userId);
     if (!preferences) {
       return new UserPreferences(userId, true, true, []);
@@ -22,6 +24,7 @@ export class ManagePreferencesUseCase {
     userId: string,
     input: UpdatePreferencesInput,
   ): Promise<UserPreferences> {
+    requireRecipient(userId);
     let preferences = await this.preferencesRepo.findByUserId(userId);
 
     if (!preferences) {
