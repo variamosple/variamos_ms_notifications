@@ -120,6 +120,17 @@ describe("NotificationController HTTP contract", () => {
         { ...body, recipients: { userIds: [], roles: [] } },
       ],
       ["an empty template key", { ...body, templateKey: "" }],
+      [
+        "role recipients",
+        { ...body, recipients: { roles: ["administrator"] } },
+      ],
+      [
+        "role recipients next to user ids",
+        {
+          ...body,
+          recipients: { userIds: ["user-1"], roles: ["administrator"] },
+        },
+      ],
       ["variables that are not an object", { ...body, variables: "Ana" }],
     ])("answers 400 for %s", async (_label, invalid) => {
       await http()

@@ -1,14 +1,17 @@
 import { Injectable } from "@nestjs/common";
 import { IUserService } from "../../Domain/Services/IUserService.js";
 
+/**
+ * Role resolution is not available in this service: the admin service
+ * resolves roles into user ids before sending (EV-99, CA-NT-02, option a).
+ * It used to return made-up ids; it now fails instead of notifying wrong
+ * recipients.
+ */
 @Injectable()
 export class UserServiceHttpClient implements IUserService {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public async findUserIdsByRoles(roles: string[]): Promise<string[]> {
-    // Stub returning simulated user IDs based on requested roles
-    if (roles.includes("administrator")) {
-      return ["admin-1", "admin-2"];
-    }
-    return ["user-1", "user-2"];
+  public async findUserIdsByRoles(_roles: string[]): Promise<string[]> {
+    throw new Error(
+      "Role resolution is not available: send user ids resolved by the admin service.",
+    );
   }
 }

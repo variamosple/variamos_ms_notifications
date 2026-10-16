@@ -14,6 +14,7 @@ import {
   type AccessControlMode,
 } from "../Auth/AccessControlMode.js";
 import { AccessTokenVerifier } from "../Auth/AccessTokenVerifier.js";
+import { ALLOWED_ORIGINS } from "../Config/allowedOrigins.js";
 
 function extractUserId(client: Socket): string | null {
   let raw = client.handshake.auth?.userId || client.handshake.query?.userId;
@@ -52,7 +53,7 @@ async function resolveRoom(
 @Injectable()
 @WebSocketGateway({
   cors: {
-    origin: "*",
+    origin: ALLOWED_ORIGINS,
   },
 })
 export class RootNotificationGateway
@@ -114,7 +115,7 @@ export class RootNotificationGateway
 @WebSocketGateway({
   namespace: "variamos_ms_notifications",
   cors: {
-    origin: "*",
+    origin: ALLOWED_ORIGINS,
   },
 })
 export class NotificationGateway
