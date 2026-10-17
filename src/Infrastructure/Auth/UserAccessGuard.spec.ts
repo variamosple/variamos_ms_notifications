@@ -62,8 +62,8 @@ describe("UserAccessGuard", () => {
     vi.unstubAllEnvs();
   });
 
-  it("starts in observe mode until clients send access tokens", () => {
-    expect(ACCESS_CONTROL_MODE).toBe("observe");
+  it("enforces access tokens now that clients send them", () => {
+    expect(ACCESS_CONTROL_MODE).toBe("enforce");
   });
 
   describe("observe mode", () => {
