@@ -7,6 +7,12 @@ import { DbTestHelper } from "./db-test-helper.js";
 import { NotificationTemplate } from "../src/Domain/Entities/NotificationTemplate.js";
 import { NotificationTemplateEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/NotificationTemplateEntity.js";
 import { DataSource } from "typeorm";
+import { SignJWT } from "jose";
+import {
+  ACCESS_TOKEN_AUDIENCE,
+  ACCESS_TOKEN_ISSUER,
+  deriveAccessTokenKey,
+} from "../src/Infrastructure/Auth/AccessTokenVerifier.js";
 
 interface PostgresOptions {
   host?: string;
@@ -21,6 +27,20 @@ describe("AppModule (e2e)", () => {
   let dbHelper: DbTestHelper;
   let dataSource: DataSource;
   const internalToken = "super-secret-internal-token";
+
+  // Access token as issued by variamos_ms_admin (ADR-0001)
+  const userToken = (userId: string) =>
+    new SignJWT({})
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject(userId)
+      .setIssuer(ACCESS_TOKEN_ISSUER)
+      .setAudience(ACCESS_TOKEN_AUDIENCE)
+      .setIssuedAt()
+      .setExpirationTime("15m")
+      .sign(deriveAccessTokenKey(internalToken));
+  const asUser = async (userId: string) => ({
+    Authorization: `Bearer ${await userToken(userId)}`,
+  });
 
   beforeAll(async () => {
     dbHelper = new DbTestHelper();
@@ -108,7 +128,8 @@ describe("AppModule (e2e)", () => {
         });
 
       const response = await request(app.getHttpServer())
-        .get("/notifications?recipientId=user-1&page=1&limit=5&folder=inbox")
+        .get("/notifications?page=1&limit=5&folder=inbox")
+        .set(await asUser("user-1"))
         .expect(HttpStatus.OK);
 
       expect(response.body).toHaveLength(1);
@@ -132,20 +153,86 @@ describe("AppModule (e2e)", () => {
       // 2. Delete it
       await request(app.getHttpServer())
         .delete(`/notifications/${notifId}`)
+        .set(await asUser("user-1"))
         .expect(HttpStatus.NO_CONTENT);
 
       // 3. Verify it is no longer in inbox
       const inboxResponse = await request(app.getHttpServer())
-        .get("/notifications?recipientId=user-1&page=1&limit=5&folder=inbox")
+        .get("/notifications?page=1&limit=5&folder=inbox")
+        .set(await asUser("user-1"))
         .expect(HttpStatus.OK);
       expect(inboxResponse.body).toHaveLength(0);
 
       // 4. Verify it is in trash
       const trashResponse = await request(app.getHttpServer())
-        .get("/notifications?recipientId=user-1&page=1&limit=5&folder=trash")
+        .get("/notifications?page=1&limit=5&folder=trash")
+        .set(await asUser("user-1"))
         .expect(HttpStatus.OK);
       expect(trashResponse.body).toHaveLength(1);
       expect(trashResponse.body[0].id).toBe(notifId);
+    });
+  });
+
+  describe("Access control (enforce mode)", () => {
+    it("refuses a user route without access token", async () => {
+      await request(app.getHttpServer())
+        .get("/notifications?recipientId=user-1")
+        .expect(HttpStatus.UNAUTHORIZED);
+    });
+
+    it("refuses a forged access token", async () => {
+      const forged = await new SignJWT({})
+        .setProtectedHeader({ alg: "HS256" })
+        .setSubject("user-1")
+        .setIssuer(ACCESS_TOKEN_ISSUER)
+        .setAudience(ACCESS_TOKEN_AUDIENCE)
+        .setExpirationTime("15m")
+        .sign(deriveAccessTokenKey("another-secret"));
+
+      await request(app.getHttpServer())
+        .get("/notifications")
+        .set("Authorization", `Bearer ${forged}`)
+        .expect(HttpStatus.UNAUTHORIZED);
+    });
+
+    it("never lists another user's notifications, whatever recipientId says", async () => {
+      await request(app.getHttpServer())
+        .post("/notifications")
+        .set("x-internal-token", internalToken)
+        .send({
+          recipients: { userIds: ["user-1"] },
+          templateKey: "test_template",
+          variables: { name: "Nathan" },
+        })
+        .expect(HttpStatus.CREATED);
+
+      const response = await request(app.getHttpServer())
+        .get("/notifications?recipientId=user-1")
+        .set(await asUser("user-2"))
+        .expect(HttpStatus.OK);
+
+      expect(response.body).toHaveLength(0);
+    });
+
+    it("keeps the health check open", async () => {
+      await request(app.getHttpServer()).get("/health").expect(HttpStatus.OK);
+    });
+
+    it("disconnects a socket without access token, even with a userId", async () => {
+      await app.listen(0);
+      const serverUrl = await app.getUrl();
+      const wsClient: Socket = io(serverUrl, {
+        autoConnect: false,
+        query: { userId: "user-1" },
+      });
+
+      const disconnected = new Promise<string>((resolve) => {
+        wsClient.on("disconnect", (reason) => resolve(reason));
+      });
+      wsClient.connect();
+
+      await expect(disconnected).resolves.toBe("io server disconnect");
+      wsClient.close();
     });
   });
 
@@ -157,7 +244,7 @@ describe("AppModule (e2e)", () => {
 
       const wsClient: Socket = io(serverUrl, {
         autoConnect: false,
-        query: { userId: "user-ws-1" },
+        auth: { token: await userToken("user-ws-1") },
       });
 
       const connected = new Promise<void>((resolve) => {
@@ -197,7 +284,7 @@ describe("AppModule (e2e)", () => {
 
       const wsClient: Socket = io(`${serverUrl}/variamos_ms_notifications`, {
         autoConnect: false,
-        query: { userId: "user-ws-2" },
+        auth: { token: await userToken("user-ws-2") },
       });
 
       const connected = new Promise<void>((resolve) => {

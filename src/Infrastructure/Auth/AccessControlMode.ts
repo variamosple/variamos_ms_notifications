@@ -8,4 +8,5 @@ export type AccessControlMode = "observe" | "enforce";
 
 export const ACCESS_CONTROL_MODE_TOKEN = "ACCESS_CONTROL_MODE";
 
-export const ACCESS_CONTROL_MODE: AccessControlMode = "observe";
+// Enforced since variamos-components 0.2.3 sends access tokens (ADR-0001)
+export const ACCESS_CONTROL_MODE: AccessControlMode = "enforce";
