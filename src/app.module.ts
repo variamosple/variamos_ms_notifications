@@ -7,6 +7,10 @@ import { DatabaseModule } from "./Infrastructure/Persistence/TypeORM/database.mo
 import { NotificationEntity } from "./Infrastructure/Persistence/TypeORM/Entities/NotificationEntity.js";
 import { NotificationTemplateEntity } from "./Infrastructure/Persistence/TypeORM/Entities/NotificationTemplateEntity.js";
 import { UserPreferencesEntity } from "./Infrastructure/Persistence/TypeORM/Entities/UserPreferencesEntity.js";
+import {
+  NOTIFICATIONS_MIGRATIONS,
+  NOTIFICATIONS_MIGRATIONS_TABLE,
+} from "./Infrastructure/Persistence/TypeORM/Migrations/index.js";
 
 @Module({
   imports: [
@@ -27,7 +31,12 @@ import { UserPreferencesEntity } from "./Infrastructure/Persistence/TypeORM/Enti
             NotificationTemplateEntity,
             UserPreferencesEntity,
           ],
-          synchronize: process.env.NODE_ENV !== "production",
+          // The schema changes only through versioned migrations (T-07):
+          // synchronize would drop the columns and indexes it does not know
+          synchronize: false,
+          migrations: NOTIFICATIONS_MIGRATIONS,
+          migrationsTableName: NOTIFICATIONS_MIGRATIONS_TABLE,
+          migrationsRun: true,
           ssl: ssl ? { rejectUnauthorized: false } : false,
         };
       },

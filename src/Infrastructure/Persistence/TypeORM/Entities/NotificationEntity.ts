@@ -1,9 +1,26 @@
-import { Column, CreateDateColumn, Entity, PrimaryColumn } from "typeorm";
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  PrimaryColumn,
+} from "typeorm";
 import { JsonValue } from "../../../../Domain/Entities/JsonValue.js";
 
 @Entity({ name: "notifications" })
+// Names and indexes as production holds them: the schema builder must find
+// nothing to change (test/migrations.integration-spec.ts)
+@Index("idx_notifications_recipient", ["recipientId"])
+@Index("idx_notifications_template_key", ["templateKey"])
+@Index("idx_notifications_is_read", ["isRead"], { where: "(is_read = false)" })
+@Index("idx_notifications_deleted_at", ["deletedAt"], {
+  where: "(deleted_at IS NULL)",
+})
 export class NotificationEntity {
-  @PrimaryColumn({ type: "uuid" })
+  @PrimaryColumn({
+    type: "uuid",
+    primaryKeyConstraintName: "notifications_pkey",
+  })
   id!: string;
 
   @Column({ name: "recipient_id", type: "varchar", length: 100 })
