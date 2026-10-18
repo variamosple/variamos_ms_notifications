@@ -2,7 +2,12 @@ import { Column, Entity, PrimaryColumn } from "typeorm";
 
 @Entity({ name: "user_preferences" })
 export class UserPreferencesEntity {
-  @PrimaryColumn({ name: "user_id", type: "varchar", length: 100 })
+  @PrimaryColumn({
+    name: "user_id",
+    type: "varchar",
+    length: 100,
+    primaryKeyConstraintName: "user_preferences_pkey",
+  })
   userId!: string;
 
   @Column({ name: "email_enabled", type: "boolean", default: true })

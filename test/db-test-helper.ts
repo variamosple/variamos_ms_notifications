@@ -3,6 +3,10 @@ import { DataSource } from "typeorm";
 import { NotificationEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/NotificationEntity.js";
 import { NotificationTemplateEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/NotificationTemplateEntity.js";
 import { UserPreferencesEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/UserPreferencesEntity.js";
+import {
+  NOTIFICATIONS_MIGRATIONS,
+  NOTIFICATIONS_MIGRATIONS_TABLE,
+} from "../src/Infrastructure/Persistence/TypeORM/Migrations/index.js";
 
 export class DbTestHelper {
   private container!: StartedPostgreSqlContainer;
@@ -39,7 +43,10 @@ export class DbTestHelper {
       database: this.container.getDatabase(),
       schema: "variamos",
       entities: [NotificationEntity, NotificationTemplateEntity, UserPreferencesEntity],
-      synchronize: true, // Automatically creates tables from entities
+      // Same path as production: the tables come from the migrations
+      migrations: NOTIFICATIONS_MIGRATIONS,
+      migrationsTableName: NOTIFICATIONS_MIGRATIONS_TABLE,
+      migrationsRun: true,
     });
 
     await this.dataSource.initialize();
@@ -61,6 +68,7 @@ export class DbTestHelper {
     }
     // Truncate tables between tests to isolate datasets
     const entities = this.dataSource.entityMetadatas;
+    // The migrations table keeps its rows
     for (const entity of entities) {
       await this.dataSource.query(`TRUNCATE TABLE "variamos"."${entity.tableName}" CASCADE;`);
     }
