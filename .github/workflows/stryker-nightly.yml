@@ -1,0 +1,113 @@
+name: Mutation Testing (Stryker)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Every day at 04:30 UTC (GitHub Actions cron expressions are always UTC).
+    - cron: '30 4 * * *'
+
+permissions:
+  statuses: write
+  contents: read
+
+jobs:
+  stryker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+
+      # The run fails under the break threshold of stryker.config.json (set just
+      # under the measured score). continue-on-error lets the publish step report
+      # the score; that step then fails the job. Pull requests are not blocked.
+      - name: Run Stryker
+        id: stryker
+        continue-on-error: true
+        run: |
+          npx stryker run --reporters progress,clear-text,html,json
+
+      - name: Publish score
+        if: ${{ always() }}
+        uses: actions/github-script@v9
+        env:
+          OUTCOME: ${{ steps.stryker.outcome }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const workspace = process.env.GITHUB_WORKSPACE;
+            const outcome = process.env.OUTCOME;
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            // Score = (killed + timeout) / (killed + timeout + survived + noCoverage).
+            // CompileError and Ignored mutants are excluded, as in Stryker's own metrics.
+            const reportPath = path.join(workspace, 'reports/mutation/mutation.json');
+            let score = null;
+            const counts = {};
+            if (fs.existsSync(reportPath)) {
+              const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+              for (const file of Object.values(report.files)) {
+                for (const mutant of file.mutants) {
+                  counts[mutant.status] = (counts[mutant.status] || 0) + 1;
+                }
+              }
+              const detected = (counts.Killed || 0) + (counts.Timeout || 0);
+              const undetected = (counts.Survived || 0) + (counts.NoCoverage || 0);
+              score = detected + undetected > 0 ? (detected / (detected + undetected)) * 100 : null;
+            }
+
+            const config = JSON.parse(fs.readFileSync(path.join(workspace, 'stryker.config.json'), 'utf8'));
+            const breakAt = config.thresholds?.break ?? null;
+            const passed = outcome === 'success' && score !== null;
+            const below = score !== null && breakAt !== null && score < breakAt;
+            const verdict = passed ? 'passed' : below ? `below the ${breakAt}% threshold` : 'Stryker run failed';
+            const scoreText = score === null ? 'no valid mutant or report missing' : `${score.toFixed(2)}%`;
+
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: passed ? 'success' : 'failure',
+              context: 'Stryker / Mutation Score',
+              description: `${scoreText} (break ${breakAt}%) - ${verdict}`.slice(0, 140),
+              target_url: runUrl,
+            });
+
+            const summary = [
+              '### Stryker Mutation Testing Summary',
+              '',
+              `- **Mutation score:** ${scoreText}`,
+              `- **Mutants:** killed ${counts.Killed || 0}, timeout ${counts.Timeout || 0}, survived ${counts.Survived || 0}, no coverage ${counts.NoCoverage || 0}, compile error ${counts.CompileError || 0}`,
+              `- **Break threshold:** ${breakAt}%`,
+              `- **Status:** ${verdict}`,
+              '',
+            ];
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary.join('\n') + '\n');
+
+            if (!passed) {
+              core.setFailed('The mutation score is under its threshold or the Stryker run failed. See the job summary.');
+            }
+
+      - name: Upload mutation report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutation-report
+          path: reports/mutation/
+          if-no-files-found: ignore
