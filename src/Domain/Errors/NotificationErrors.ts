@@ -21,6 +21,17 @@ export class MissingRecipientError extends Error {
   }
 }
 
+/**
+ * No template is configured for the key of a dispatch: a server-side
+ * configuration fault, told apart from an outage by its code (T-16).
+ */
+export class TemplateNotConfiguredError extends Error {
+  constructor(public readonly templateKey: string) {
+    super(`Template with key '${templateKey}' not found`);
+    this.name = "TemplateNotConfiguredError";
+  }
+}
+
 export function requireRecipient(recipientId: string | undefined): string {
   if (typeof recipientId !== "string" || recipientId.trim() === "") {
     throw new MissingRecipientError();

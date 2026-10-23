@@ -1,5 +1,5 @@
 import os from "node:os";
-import { Controller, Get, HttpStatus, Res } from "@nestjs/common";
+import { Controller, Get, HttpStatus, Logger, Res } from "@nestjs/common";
 import { SkipThrottle } from "@nestjs/throttler";
 import { InjectDataSource } from "@nestjs/typeorm";
 import type { Response } from "express";
@@ -11,6 +11,7 @@ import { SkipUserAccessCheck } from "../Auth/SkipUserAccessCheck.js";
 @SkipThrottle()
 export class HealthController {
   private readonly startTime = Date.now();
+  private readonly logger = new Logger(HealthController.name);
 
   constructor(
     @InjectDataSource()
@@ -22,7 +23,6 @@ export class HealthController {
     const reqStart = Date.now();
     let dbStatus: "UP" | "DOWN" = "UP";
     let dbLatencyMs = 0;
-    let dbMessage: string | undefined;
 
     try {
       const t0 = Date.now();
@@ -30,7 +30,9 @@ export class HealthController {
       dbLatencyMs = Date.now() - t0;
     } catch (error) {
       dbStatus = "DOWN";
-      dbMessage = (error as Error).message;
+      // The detail of the driver (host, port, user) stays in the log:
+      // this route is public (T-16, CA-NT-07).
+      this.logger.warn(`Database check failed: ${(error as Error).message}`);
     }
 
     const totalMemory = os.totalmem();
@@ -41,7 +43,6 @@ export class HealthController {
       database: {
         status: dbStatus,
         latencyMs: dbLatencyMs,
-        ...(dbMessage ? { message: dbMessage } : {}),
       },
       memory: {
         usedMb: Math.round(usedMemory / (1024 * 1024)),

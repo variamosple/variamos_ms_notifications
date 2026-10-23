@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { JsonValue } from "../Domain/Entities/JsonValue.js";
 import { Notification } from "../Domain/Entities/Notification.js";
 import { UserPreferences } from "../Domain/Entities/UserPreferences.js";
+import { TemplateNotConfiguredError } from "../Domain/Errors/NotificationErrors.js";
 import { INotificationRepository } from "../Domain/Repositories/INotificationRepository.js";
 import { INotificationTemplateRepository } from "../Domain/Repositories/INotificationTemplateRepository.js";
 import { IUserPreferencesRepository } from "../Domain/Repositories/IUserPreferencesRepository.js";
@@ -32,7 +33,7 @@ export class SendNotificationUseCase {
     // 1. Retrieve the notification template
     const template = await this.templateRepo.findByKey(input.templateKey);
     if (!template) {
-      throw new Error(`Template with key '${input.templateKey}' not found`);
+      throw new TemplateNotConfiguredError(input.templateKey);
     }
 
     // 2. Resolve recipient user IDs (userIds)

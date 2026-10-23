@@ -1,5 +1,6 @@
 import { BadRequestException, type PipeTransform } from "@nestjs/common";
 import { ZodError, type ZodSchema } from "zod";
+import { validationIssues } from "./validationIssues.js";
 
 /**
  * Validates and converts a whole query string object with a Zod schema;
@@ -14,7 +15,7 @@ export class ZodQueryPipe implements PipeTransform {
     } catch (error) {
       throw new BadRequestException({
         message: "Invalid query parameters",
-        errors: error instanceof ZodError ? error.errors : undefined,
+        errors: error instanceof ZodError ? validationIssues(error) : undefined,
       });
     }
   }

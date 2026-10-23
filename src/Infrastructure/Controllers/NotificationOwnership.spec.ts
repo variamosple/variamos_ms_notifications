@@ -196,9 +196,11 @@ describe("Notification ownership with an access token", () => {
   });
 
   it("answers 404, not 500, for a notification that does not exist", async () => {
-    await asUserA(http().patch(`/notifications/${MISSING}/read`)).expect(
-      HttpStatus.NOT_FOUND,
-    );
+    const response = await asUserA(
+      http().patch(`/notifications/${MISSING}/read`),
+    ).expect(HttpStatus.NOT_FOUND);
+
+    expect(response.body.errorCode).toBe("NOTIFICATION_NOT_FOUND");
   });
 
   it("marks all as read only for the token user", async () => {
@@ -243,7 +245,8 @@ describe("Notification ownership with an access token", () => {
             ? http().patch(url)
             : http().delete(url);
 
-      await pending.expect(HttpStatus.BAD_REQUEST);
+      const response = await pending.expect(HttpStatus.BAD_REQUEST);
+      expect(response.body.errorCode).toBe("MISSING_RECIPIENT");
       expect(notifications.rows.get(A1)?.isRead).toBe(false);
       expect(notifications.rows.get(B1)?.isRead).toBe(false);
     });

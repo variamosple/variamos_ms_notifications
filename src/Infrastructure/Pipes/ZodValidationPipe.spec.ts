@@ -27,4 +27,23 @@ describe("ZodValidationPipe", () => {
     const input = { username: "na", age: 15 };
     expect(() => pipe.transform(input)).toThrow(BadRequestException);
   });
+
+  it("keeps only the path and the message of each issue", () => {
+    const unionPipe = new ZodValidationPipe(
+      z.object({ value: z.union([z.string(), z.number()]) }),
+    );
+
+    let thrown: unknown;
+    try {
+      unionPipe.transform({ value: true });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    expect((thrown as BadRequestException).getResponse()).toEqual({
+      message: "Validation failed",
+      errors: [{ path: ["value"], message: "Invalid input" }],
+    });
+  });
 });
