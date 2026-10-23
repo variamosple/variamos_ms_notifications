@@ -19,6 +19,6 @@
   "ignoreStatic": true,
   "coverageAnalysis": "perTest",
   "thresholds": {
-    "break": 60
+    "break": 88
   }
 }
