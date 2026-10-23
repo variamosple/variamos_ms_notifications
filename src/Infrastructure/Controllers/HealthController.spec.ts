@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import type { Response } from "express";
 import type { DataSource } from "typeorm";
 import { describe, expect, it, vi } from "vitest";
@@ -14,7 +15,6 @@ interface HealthJsonResult {
     database: {
       status: string;
       latencyMs: number;
-      message?: string;
     };
     memory: {
       usedMb: number;
@@ -55,7 +55,10 @@ describe("HealthController", () => {
     expect(jsonResult.checks.memory.percentage).toBeDefined();
   });
 
-  it("should return DEGRADED with 503 when database query fails", async () => {
+  it("should return DEGRADED with 503 when database query fails, without the driver message", async () => {
+    const warn = vi
+      .spyOn(Logger.prototype, "warn")
+      .mockImplementation(() => {});
     const mockDataSource = {
       query: vi.fn().mockRejectedValue(new Error("Connection refused")),
     } as unknown as DataSource;
@@ -81,6 +84,11 @@ describe("HealthController", () => {
     expect(statusResult).toBe(503);
     expect(jsonResult.status).toBe("DEGRADED");
     expect(jsonResult.checks.database.status).toBe("DOWN");
-    expect(jsonResult.checks.database.message).toBe("Connection refused");
+    expect(jsonResult.checks.database).not.toHaveProperty("message");
+    expect(JSON.stringify(jsonResult)).not.toContain("Connection refused");
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("Connection refused"),
+    );
+    warn.mockRestore();
   });
 });

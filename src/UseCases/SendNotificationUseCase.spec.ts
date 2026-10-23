@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { MockProxy, mock } from "vitest-mock-extended";
 import { NotificationTemplate } from "../Domain/Entities/NotificationTemplate.js";
 import { UserPreferences } from "../Domain/Entities/UserPreferences.js";
+import { TemplateNotConfiguredError } from "../Domain/Errors/NotificationErrors.js";
 import { INotificationRepository } from "../Domain/Repositories/INotificationRepository.js";
 import { INotificationTemplateRepository } from "../Domain/Repositories/INotificationTemplateRepository.js";
 import { IUserPreferencesRepository } from "../Domain/Repositories/IUserPreferencesRepository.js";
@@ -43,7 +44,7 @@ describe("SendNotificationUseCase", () => {
         variables: {},
         metadata: {},
       }),
-    ).rejects.toThrow("Template with key 'invalid_key' not found");
+    ).rejects.toBeInstanceOf(TemplateNotConfiguredError);
   });
 
   it("should create, save and send notifications to specific userIds", async () => {

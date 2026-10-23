@@ -1,4 +1,4 @@
-import { HttpStatus, type INestApplication } from "@nestjs/common";
+import { HttpStatus, type INestApplication, Logger } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import {
@@ -10,6 +10,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { TemplateNotConfiguredError } from "../../Domain/Errors/NotificationErrors.js";
 import { DeleteNotificationUseCase } from "../../UseCases/DeleteNotificationUseCase.js";
 import { EmptyTrashUseCase } from "../../UseCases/EmptyTrashUseCase.js";
 import { GetInboxUseCase } from "../../UseCases/GetInboxUseCase.js";
@@ -112,6 +113,44 @@ describe("NotificationController HTTP contract", () => {
         metadata: {},
         actorId: undefined,
       });
+    });
+
+    it("answers 500 with TEMPLATE_NOT_CONFIGURED for an unknown template", async () => {
+      const error = vi
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => {});
+      useCases.send.execute.mockRejectedValue(
+        new TemplateNotConfiguredError("welcome"),
+      );
+
+      const response = await http()
+        .post("/notifications")
+        .set("x-internal-token", INTERNAL_TOKEN)
+        .send(body)
+        .expect(HttpStatus.INTERNAL_SERVER_ERROR);
+
+      expect(response.body).toEqual({
+        statusCode: 500,
+        error: "Internal Server Error",
+        errorCode: "TEMPLATE_NOT_CONFIGURED",
+        message: "The notification template is not configured.",
+      });
+      expect(error).toHaveBeenCalledWith(expect.stringContaining("welcome"));
+      error.mockRestore();
+    });
+
+    it("answers 400 with the path and message of each issue only", async () => {
+      const response = await http()
+        .post("/notifications")
+        .set("x-internal-token", INTERNAL_TOKEN)
+        .send({ ...body, templateKey: "" })
+        .expect(HttpStatus.BAD_REQUEST);
+
+      expect(response.body.message).toBe("Validation failed");
+      expect(response.body.errors.length).toBeGreaterThan(0);
+      for (const issue of response.body.errors) {
+        expect(Object.keys(issue).sort()).toEqual(["message", "path"]);
+      }
     });
 
     it.each([
