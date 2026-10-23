@@ -45,11 +45,29 @@ const BoundedJsonRecord = z
 
 const Identifier = z.string().trim().min(1).max(128);
 
+// The admin service sends every active account on a broadcast; the 100 kB
+// body limit already caps valid ids at about 2,600.
+export const MAX_RECIPIENTS = 5_000;
+export const MAX_ROLES = 100;
+
+/**
+ * An array of at most `max` items, counted before its items are checked.
+ * zod 3 checks every item even past `.max()`, keeping one issue per invalid
+ * item: a long array could exhaust the memory (GHSA-mrhx-c7xc-m3w5).
+ */
+function boundedArray<T extends z.ZodTypeAny>(item: T, max: number) {
+  return z
+    .custom<unknown[]>((value) => Array.isArray(value) && value.length <= max, {
+      message: `Expected an array of at most ${max} items`,
+    })
+    .pipe(z.array(item));
+}
+
 export const SendNotificationSchema = z.object({
   recipients: z
     .object({
-      userIds: z.array(Identifier).optional(),
-      roles: z.array(z.string()).optional(),
+      userIds: boundedArray(Identifier, MAX_RECIPIENTS).optional(),
+      roles: boundedArray(z.string(), MAX_ROLES).optional(),
     })
     .refine((data) => !data.roles || data.roles.length === 0, {
       // The admin service resolves roles into user ids before sending
