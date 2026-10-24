@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { validateEnv } from "./env.config.js";
+import { REQUIRED_IN_PRODUCTION, validateEnv } from "./env.config.js";
 
 // Every variable the service reads, as the server sets them
 const SERVER_ENV = {
+  NODE_ENV: "production",
   PORT: "3001",
   NOTIFICATION_INTERNAL_TOKEN: "test-internal-token",
   DATABASE_HOST: "db",
@@ -44,8 +45,7 @@ describe("validateEnv", () => {
     expect(validateEnv().DATABASE_SSL).toBe(expected);
   });
 
-  it("stops the service on an invalid variable", () => {
-    stubEnv({ ...SERVER_ENV, DATABASE_PORT: "not-a-port" });
+  const expectStop = (variable: string) => {
     const exit = vi.spyOn(process, "exit").mockImplementation(() => {
       throw new Error("exit");
     });
@@ -55,7 +55,33 @@ describe("validateEnv", () => {
     expect(exit).toHaveBeenCalledWith(1);
     expect(error).toHaveBeenCalledWith(
       "Invalid environment variables:",
-      expect.stringContaining("DATABASE_PORT"),
+      expect.stringContaining(variable),
     );
+  };
+
+  it("stops the service on an invalid variable", () => {
+    stubEnv({ ...SERVER_ENV, DATABASE_PORT: "not-a-port" });
+
+    expectStop("DATABASE_PORT");
+  });
+
+  it.each(REQUIRED_IN_PRODUCTION)(
+    "stops the service in production without %s",
+    (name) => {
+      stubEnv({ ...SERVER_ENV, [name]: " " });
+
+      expectStop(`${name} is required in production`);
+    },
+  );
+
+  it("starts outside production without the secrets", () => {
+    stubEnv({
+      NODE_ENV: "development",
+      ...Object.fromEntries(
+        REQUIRED_IN_PRODUCTION.map((name) => [name, undefined]),
+      ),
+    });
+
+    expect(validateEnv()).toMatchObject({ NODE_ENV: "development" });
   });
 });

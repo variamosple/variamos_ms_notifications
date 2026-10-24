@@ -11,7 +11,9 @@ describe("NotificationInternalGuard", () => {
     process.env.NOTIFICATION_INTERNAL_TOKEN = mockToken;
   });
 
-  const createMockContext = (headerToken?: string): ExecutionContext => {
+  const createMockContext = (
+    headerToken?: string | string[],
+  ): ExecutionContext => {
     const request = {
       headers: {
         "x-internal-token": headerToken,
@@ -34,8 +36,18 @@ describe("NotificationInternalGuard", () => {
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
   });
 
-  it("should throw UnauthorizedException if token does not match", () => {
-    const context = createMockContext("invalid-token");
+  it.each([
+    ["does not match", "invalid-token"],
+    ["only shares a prefix", `${mockToken}-longer`],
+    ["is repeated in the header", [mockToken, mockToken]],
+  ])("should throw UnauthorizedException if token %s", (_, headerToken) => {
+    const context = createMockContext(headerToken);
+    expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
+  });
+
+  it("should refuse every token when none is configured", () => {
+    delete process.env.NOTIFICATION_INTERNAL_TOKEN;
+    const context = createMockContext("any-token");
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
   });
 });
