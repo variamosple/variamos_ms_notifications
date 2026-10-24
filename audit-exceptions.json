@@ -10,11 +10,5 @@
     "package": "source-map-js",
     "reason": "corrigé dans la pile, à partir de chore/update-dev-tooling-2026-10",
     "expires": "2026-11-30"
-  },
-  {
-    "id": "GHSA-MRHX-C7XC-M3W5",
-    "package": "zod",
-    "reason": "aucun correctif pour zod 3 ; tableaux de destinataires comptés avant validation de leurs éléments (fix/zod-array-bounds-2026-10) ; passage à zod 4 à planifier",
-    "expires": "2026-11-30"
   }
 ]

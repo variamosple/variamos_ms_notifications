@@ -9,7 +9,7 @@ export const JsonSchema: z.ZodType<JsonValue> = z.lazy(() =>
     z.boolean(),
     z.null(),
     z.array(JsonSchema),
-    z.record(JsonSchema),
+    z.record(z.string(), JsonSchema),
   ]),
 );
 
@@ -38,9 +38,9 @@ export function isBoundedJson(value: JsonValue, depth = 0): boolean {
 }
 
 const BoundedJsonRecord = z
-  .record(JsonSchema)
+  .record(z.string(), JsonSchema)
   .refine((record) => isBoundedJson(record), {
-    message: `Too large: at most ${JSON_LIMITS.depth} levels, ${JSON_LIMITS.keys} keys, ${JSON_LIMITS.items} items and ${JSON_LIMITS.stringLength} characters per value`,
+    error: `Too large: at most ${JSON_LIMITS.depth} levels, ${JSON_LIMITS.keys} keys, ${JSON_LIMITS.items} items and ${JSON_LIMITS.stringLength} characters per value`,
   });
 
 const Identifier = z.string().trim().min(1).max(128);
@@ -51,14 +51,14 @@ export const MAX_RECIPIENTS = 5_000;
 export const MAX_ROLES = 100;
 
 /**
- * An array of at most `max` items, counted before its items are checked.
- * zod 3 checks every item even past `.max()`, keeping one issue per invalid
- * item: a long array could exhaust the memory (GHSA-mrhx-c7xc-m3w5).
+ * An array of at most `max` items, counted before its items are checked:
+ * a long array is refused without one check, nor one issue, per item
+ * (GHSA-mrhx-c7xc-m3w5).
  */
-function boundedArray<T extends z.ZodTypeAny>(item: T, max: number) {
+function boundedArray<T extends z.ZodType>(item: T, max: number) {
   return z
     .custom<unknown[]>((value) => Array.isArray(value) && value.length <= max, {
-      message: `Expected an array of at most ${max} items`,
+      error: `Expected an array of at most ${max} items`,
     })
     .pipe(z.array(item));
 }
@@ -72,12 +72,12 @@ export const SendNotificationSchema = z.object({
     .refine((data) => !data.roles || data.roles.length === 0, {
       // The admin service resolves roles into user ids before sending
       // (EV-99, CA-NT-02, option a); this service cannot resolve them.
-      message:
+      error:
         "Role recipients are not supported: resolve them into userIds before sending",
       path: ["roles"],
     })
     .refine((data) => data.userIds && data.userIds.length > 0, {
-      message: "At least one recipient in userIds must be provided",
+      error: "At least one recipient in userIds must be provided",
       path: ["userIds"],
     }),
   templateKey: z.string().min(1).max(100),

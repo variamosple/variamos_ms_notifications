@@ -1,5 +1,5 @@
 import { BadRequestException, type PipeTransform } from "@nestjs/common";
-import { ZodError, type ZodSchema } from "zod";
+import { ZodError, type ZodType } from "zod";
 import { validationIssues } from "./validationIssues.js";
 
 /**
@@ -7,7 +7,7 @@ import { validationIssues } from "./validationIssues.js";
  * an invalid value answers 400 instead of falling back to a default.
  */
 export class ZodQueryPipe implements PipeTransform {
-  constructor(private readonly schema: ZodSchema) {}
+  constructor(private readonly schema: ZodType) {}
 
   public transform(value: unknown): unknown {
     try {
