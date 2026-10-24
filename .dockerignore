@@ -6,3 +6,9 @@ coverage
 *.log
 .nyc_output
 .stryker-tmp
+
+# Secrets never enter the image: the variables come from the container (EV-69)
+.env
+.env.*
+*.key
+*.pem
