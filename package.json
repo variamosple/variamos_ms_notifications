@@ -72,6 +72,7 @@
     "vitest-mock-extended": "^5.1.1"
   },
   "overrides": {
+    "multer": "^2.5.0",
     "qs": "^6.15.3"
   }
 }
