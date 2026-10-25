@@ -8,7 +8,10 @@ import { INotificationTemplateRepository } from "../Domain/Repositories/INotific
 import { IUserPreferencesRepository } from "../Domain/Repositories/IUserPreferencesRepository.js";
 import { INotificationChannel } from "../Domain/Services/INotificationChannel.js";
 import { IUserService } from "../Domain/Services/IUserService.js";
-import { SendNotificationUseCase } from "./SendNotificationUseCase.js";
+import {
+  DISPATCH_BATCH_SIZE,
+  SendNotificationUseCase,
+} from "./SendNotificationUseCase.js";
 
 describe("SendNotificationUseCase", () => {
   let notificationRepo: MockProxy<INotificationRepository>;
@@ -57,11 +60,11 @@ describe("SendNotificationUseCase", () => {
     templateRepo.findByKey.mockResolvedValue(template);
 
     // Mock preferences to be enabled
-    preferencesRepo.findByUserId.mockImplementation(async (userId) => {
-      return new UserPreferences(userId, true, true, []);
-    });
+    preferencesRepo.findByUserIds.mockImplementation(async (userIds) =>
+      userIds.map((userId) => new UserPreferences(userId, true, true, [])),
+    );
 
-    notificationRepo.save.mockImplementation(async (notif) => notif);
+    notificationRepo.saveMany.mockImplementation(async (batch) => batch);
 
     const result = await useCase.execute({
       recipients: { userIds: ["user-1", "user-2"] },
@@ -75,7 +78,7 @@ describe("SendNotificationUseCase", () => {
     expect(result[1].recipientId).toBe("user-2");
     expect(result[0].variables).toEqual({ name: "Tester" });
     expect(result[0].isRead).toBe(false);
-    expect(notificationRepo.save).toHaveBeenCalledTimes(2);
+    expect(notificationRepo.saveMany).toHaveBeenCalledTimes(1);
     expect(notificationChannel.send).toHaveBeenCalledTimes(2);
   });
 
@@ -88,10 +91,10 @@ describe("SendNotificationUseCase", () => {
     );
     templateRepo.findByKey.mockResolvedValue(template);
     userService.findUserIdsByRoles.mockResolvedValue(["admin-1", "admin-2"]);
-    preferencesRepo.findByUserId.mockImplementation(async (userId) => {
-      return new UserPreferences(userId, true, true, []);
-    });
-    notificationRepo.save.mockImplementation(async (notif) => notif);
+    preferencesRepo.findByUserIds.mockImplementation(async (userIds) =>
+      userIds.map((userId) => new UserPreferences(userId, true, true, [])),
+    );
+    notificationRepo.saveMany.mockImplementation(async (batch) => batch);
 
     const result = await useCase.execute({
       recipients: { roles: ["administrator"] },
@@ -138,14 +141,12 @@ describe("SendNotificationUseCase", () => {
     templateRepo.findByKey.mockResolvedValue(template);
 
     // user-1 has muted "review_assigned", user-2 has not
-    preferencesRepo.findByUserId.mockImplementation(async (userId) => {
-      if (userId === "user-1") {
-        return new UserPreferences(userId, true, true, ["review_assigned"]);
-      }
-      return new UserPreferences(userId, true, true, []);
-    });
+    preferencesRepo.findByUserIds.mockResolvedValue([
+      new UserPreferences("user-1", true, true, ["review_assigned"]),
+      new UserPreferences("user-2", true, true, []),
+    ]);
 
-    notificationRepo.save.mockImplementation(async (notif) => notif);
+    notificationRepo.saveMany.mockImplementation(async (batch) => batch);
 
     const result = await useCase.execute({
       recipients: { userIds: ["user-1", "user-2"] },
@@ -156,7 +157,7 @@ describe("SendNotificationUseCase", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].recipientId).toBe("user-2");
-    expect(notificationRepo.save).toHaveBeenCalledTimes(1);
+    expect(notificationRepo.saveMany.mock.calls[0][0]).toHaveLength(1);
     expect(notificationChannel.send).toHaveBeenCalledTimes(1);
   });
 
@@ -169,9 +170,9 @@ describe("SendNotificationUseCase", () => {
     );
     templateRepo.findByKey.mockResolvedValue(template);
 
-    // Mock findByUserId to return null (not found)
-    preferencesRepo.findByUserId.mockResolvedValue(null);
-    notificationRepo.save.mockImplementation(async (notif) => notif);
+    // No preferences saved for this user
+    preferencesRepo.findByUserIds.mockResolvedValue([]);
+    notificationRepo.saveMany.mockImplementation(async (batch) => batch);
 
     const result = await useCase.execute({
       recipients: { userIds: ["user-new"] },
@@ -196,10 +197,10 @@ describe("SendNotificationUseCase", () => {
     );
     templateRepo.findByKey.mockResolvedValue(template);
 
-    preferencesRepo.findByUserId.mockResolvedValue(
+    preferencesRepo.findByUserIds.mockResolvedValue([
       new UserPreferences("user-1", true, false, []),
-    );
-    notificationRepo.save.mockImplementation(async (notif) => notif);
+    ]);
+    notificationRepo.saveMany.mockImplementation(async (batch) => batch);
 
     const result = await useCase.execute({
       recipients: { userIds: ["user-1"] },
@@ -210,7 +211,74 @@ describe("SendNotificationUseCase", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].recipientId).toBe("user-1");
-    expect(notificationRepo.save).toHaveBeenCalledTimes(1);
+    expect(notificationRepo.saveMany.mock.calls[0][0]).toHaveLength(1);
     expect(notificationChannel.send).not.toHaveBeenCalled();
+  });
+
+  describe("dispatch by batch (EV-101, OPT-04)", () => {
+    const recipients = (count: number) =>
+      Array.from({ length: count }, (_, i) => `user-${i}`);
+
+    beforeEach(() => {
+      templateRepo.findByKey.mockResolvedValue(
+        new NotificationTemplate("broadcast", "News", "Body", new Date()),
+      );
+      preferencesRepo.findByUserIds.mockResolvedValue([]);
+      notificationRepo.saveMany.mockImplementation(async (batch) => batch);
+    });
+
+    it.each([
+      [200, 1],
+      [1201, 3],
+    ])(
+      "reads the preferences and saves %i notifications in %i round trips each",
+      async (count, roundTrips) => {
+        const result = await useCase.execute({
+          recipients: { userIds: recipients(count) },
+          templateKey: "broadcast",
+          variables: {},
+          metadata: {},
+        });
+
+        expect(result).toHaveLength(count);
+        expect(preferencesRepo.findByUserIds).toHaveBeenCalledTimes(roundTrips);
+        expect(notificationRepo.saveMany).toHaveBeenCalledTimes(roundTrips);
+        expect(
+          notificationRepo.saveMany.mock.calls.map(([batch]) => batch.length),
+        ).toEqual(
+          Array.from({ length: roundTrips }, (_, i) =>
+            Math.min(DISPATCH_BATCH_SIZE, count - i * DISPATCH_BATCH_SIZE),
+          ),
+        );
+        expect(notificationChannel.send).toHaveBeenCalledTimes(count);
+      },
+    );
+
+    it("sends only what was saved, and stops at a failed batch", async () => {
+      const events: string[] = [];
+      notificationRepo.saveMany
+        .mockImplementationOnce(async (batch) => {
+          events.push(`saved ${batch.length}`);
+          return batch;
+        })
+        .mockRejectedValueOnce(new Error("database down"));
+      notificationChannel.send.mockImplementation(async () => {
+        events.push("sent");
+      });
+
+      await expect(
+        useCase.execute({
+          recipients: { userIds: recipients(DISPATCH_BATCH_SIZE + 10) },
+          templateKey: "broadcast",
+          variables: {},
+          metadata: {},
+        }),
+      ).rejects.toThrow("database down");
+
+      expect(events[0]).toBe(`saved ${DISPATCH_BATCH_SIZE}`);
+      expect(events.filter((e) => e === "sent")).toHaveLength(
+        DISPATCH_BATCH_SIZE,
+      );
+    });
   });
 });

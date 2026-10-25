@@ -72,6 +72,9 @@ class InMemoryPreferences implements IUserPreferencesRepository {
   public async findByUserId(userId: string) {
     return this.rows.get(userId) ?? null;
   }
+  public async findByUserIds(userIds: string[]) {
+    return userIds.flatMap((id) => this.rows.get(id) ?? []);
+  }
   public async save(preferences: UserPreferences) {
     this.rows.set(preferences.userId, preferences);
     return preferences;

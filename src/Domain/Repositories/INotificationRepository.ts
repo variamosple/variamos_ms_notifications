@@ -2,6 +2,7 @@ import { Notification } from "../Entities/Notification.js";
 
 export interface INotificationRepository {
   save(notification: Notification): Promise<Notification>;
+  // New notifications only, saved together: all or none
   saveMany(notifications: Notification[]): Promise<Notification[]>;
   findById(id: string): Promise<Notification | null>;
   findByRecipient(
