@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import { PostgresQueryRunner } from "typeorm/driver/postgres/PostgresQueryRunner.js";
 import { DataSource } from "typeorm";
 import { DbTestHelper } from "./db-test-helper.js";
 import { NotificationTypeORMRepository } from "../src/Infrastructure/Persistence/TypeORM/Repositories/NotificationTypeORMRepository.js";
@@ -58,6 +59,17 @@ describe("Repositories (Integration)", () => {
       const found = await preferencesRepo.findByUserId("non-existent");
       expect(found).toBeNull();
     });
+
+    it("finds the preferences of several users at once, those saved only", async () => {
+      await preferencesRepo.save(new UserPreferences("user-1", true, false, []));
+      await preferencesRepo.save(new UserPreferences("user-2", true, true, ["e"]));
+      await preferencesRepo.save(new UserPreferences("user-3", true, true, []));
+
+      const found = await preferencesRepo.findByUserIds(["user-2", "user-1", "absent"]);
+
+      expect(found.map((p) => p.userId).sort()).toEqual(["user-1", "user-2"]);
+      expect(await preferencesRepo.findByUserIds([])).toEqual([]);
+    });
   });
 
   describe("NotificationTemplateRepository", () => {
@@ -112,9 +124,42 @@ describe("Repositories (Integration)", () => {
         new Date(),
       );
 
-      await notificationRepo.saveMany([notif2]);
+      const saved = await notificationRepo.saveMany([notif2]);
       const found2 = await notificationRepo.findById("bebfbd90-1234-5678-9012-36689f94b8cf");
-      expect(found2).not.toBeNull();
+      expect(found2).toEqual(saved[0]);
+    });
+
+    it("saves a batch in one INSERT, all or none (EV-101, OPT-04)", async () => {
+      const notifAt = (id: string) =>
+        new Notification(id, "user-1", null, "key-1", { n: [1, { a: null }] }, {}, false, null, new Date("2026-10-25T10:00:00Z"));
+      const existing = notifAt("11111111-1234-4678-9012-36689f94b8cf");
+      await notificationRepo.saveMany([existing]);
+
+      // A batch holding a notification already saved fails as a whole
+      await expect(
+        notificationRepo.saveMany([
+          notifAt("22222222-1234-4678-9012-36689f94b8cf"),
+          existing,
+        ]),
+      ).rejects.toThrow();
+      expect(await notificationRepo.findById("22222222-1234-4678-9012-36689f94b8cf")).toBeNull();
+
+      const query = vi.spyOn(PostgresQueryRunner.prototype, "query");
+      let queries: string[];
+      try {
+        await notificationRepo.saveMany(
+          Array.from({ length: 50 }, (_, i) =>
+            notifAt(`33333333-1234-4678-9012-${String(i).padStart(12, "0")}`),
+          ),
+        );
+        queries = query.mock.calls.map(([sql]) => sql);
+      } finally {
+        query.mockRestore();
+      }
+      expect(queries.filter((q) => !/^(START|COMMIT)/.test(q))).toEqual([
+        expect.stringMatching(/^INSERT INTO/),
+      ]);
+      expect((await notificationRepo.findByRecipient("user-1", 1, 100, "inbox")).length).toBe(51);
     });
 
     it("should support inbox/trash folders and pagination", async () => {

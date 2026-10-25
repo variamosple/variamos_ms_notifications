@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { In, Repository } from "typeorm";
 import { UserPreferences } from "../../../../Domain/Entities/UserPreferences.js";
 import { IUserPreferencesRepository } from "../../../../Domain/Repositories/IUserPreferencesRepository.js";
 import { UserPreferencesEntity } from "../Entities/UserPreferencesEntity.js";
@@ -21,6 +21,16 @@ export class UserPreferencesTypeORMRepository
       return null;
     }
     return UserPreferencesMapper.toDomain(entity);
+  }
+
+  public async findByUserIds(userIds: string[]): Promise<UserPreferences[]> {
+    if (userIds.length === 0) {
+      return [];
+    }
+    const entities = await this.repository.find({
+      where: { userId: In(userIds) },
+    });
+    return entities.map((e) => UserPreferencesMapper.toDomain(e));
   }
 
   public async save(preferences: UserPreferences): Promise<UserPreferences> {

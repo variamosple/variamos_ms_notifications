@@ -20,6 +20,14 @@ export interface SendNotificationInput {
   actorId?: string | null;
 }
 
+// Recipients read and notifications inserted per database round trip
+export const DISPATCH_BATCH_SIZE = 500;
+
+const chunks = <T>(items: T[], size: number): T[][] =>
+  Array.from({ length: Math.ceil(items.length / size) }, (_, i) =>
+    items.slice(i * size, (i + 1) * size),
+  );
+
 export class SendNotificationUseCase {
   constructor(
     private readonly notificationRepo: INotificationRepository,
@@ -53,46 +61,51 @@ export class SendNotificationUseCase {
     // Deduplicate IDs
     recipientIds = Array.from(new Set(recipientIds));
 
-    const createdNotifications: Notification[] = [];
-
-    // 3. Process dispatch for each recipient
-    for (const recipientId of recipientIds) {
-      // Fetch user preferences
-      let preferences = await this.preferencesRepo.findByUserId(recipientId);
-
-      if (!preferences) {
-        // Default preferences if not configured
-        preferences = new UserPreferences(recipientId, true, true, []);
+    // 3. Read the preferences of all recipients at once; a user without
+    // saved preferences gets the defaults
+    const preferencesByUser = new Map<string, UserPreferences>();
+    for (const ids of chunks(recipientIds, DISPATCH_BATCH_SIZE)) {
+      for (const preferences of await this.preferencesRepo.findByUserIds(ids)) {
+        preferencesByUser.set(preferences.userId, preferences);
       }
+    }
+    const preferencesOf = (recipientId: string) =>
+      preferencesByUser.get(recipientId) ??
+      new UserPreferences(recipientId, true, true, []);
 
-      // Check if user has muted this eventType
-      if (preferences.isMuted(input.templateKey)) {
-        continue;
-      }
-
-      // Generate the notification
-      const notification = new Notification(
-        randomUUID(),
-        recipientId,
-        input.actorId || null,
-        input.templateKey,
-        input.variables,
-        input.metadata,
-        false, // isRead
-        null, // readAt
-        new Date(), // createdAt
-        null, // deletedAt
+    // 4. One notification per recipient who has not muted this event type
+    const notifications = recipientIds
+      .filter(
+        (recipientId) => !preferencesOf(recipientId).isMuted(input.templateKey),
+      )
+      .map(
+        (recipientId) =>
+          new Notification(
+            randomUUID(),
+            recipientId,
+            input.actorId || null,
+            input.templateKey,
+            input.variables,
+            input.metadata,
+            false, // isRead
+            null, // readAt
+            new Date(), // createdAt
+            null, // deletedAt
+          ),
       );
 
-      // Save notification to database
-      const savedNotification = await this.notificationRepo.save(notification);
-
-      // Send to active channels (WebSocket, email, etc.)
-      if (preferences.inAppEnabled) {
-        await this.notificationChannel.send(savedNotification);
+    // 5. Save by batch, then send each saved batch to the active channels
+    // (WebSocket): a notification is never sent before it is saved. A failed
+    // batch stops the dispatch; the batches before it stay saved and sent.
+    const createdNotifications: Notification[] = [];
+    for (const batch of chunks(notifications, DISPATCH_BATCH_SIZE)) {
+      const saved = await this.notificationRepo.saveMany(batch);
+      for (const notification of saved) {
+        if (preferencesOf(notification.recipientId).inAppEnabled) {
+          await this.notificationChannel.send(notification);
+        }
       }
-
-      createdNotifications.push(savedNotification);
+      createdNotifications.push(...saved);
     }
 
     return createdNotifications;
