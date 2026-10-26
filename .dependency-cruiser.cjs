@@ -1,3 +1,6 @@
+// Test files may reach any layer to build their doubles.
+const TESTS = '\\.(test|spec)\\.ts$';
+
 module.exports = {
   forbidden: [
     {
@@ -13,6 +16,13 @@ module.exports = {
       severity: 'error',
       from: { path: '^src/UseCases' },
       to: { path: '^src/Infrastructure|^src/app' }
+    },
+    {
+      name: 'core-uses-no-package',
+      comment: 'Domain and UseCases depend on no npm package: a library (NestJS, TypeORM, Socket.IO...) goes behind a port implemented in Infrastructure. Node built-ins stay allowed.',
+      severity: 'error',
+      from: { path: '^src/(Domain|UseCases)', pathNot: TESTS },
+      to: { dependencyTypesNot: ['local', 'core'] }
     },
     {
       name: 'no-circular-dependencies',
