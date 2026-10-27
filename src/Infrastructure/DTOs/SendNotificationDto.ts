@@ -2,7 +2,7 @@ import { z } from "zod";
 import { JsonValue } from "../../Domain/Entities/JsonValue.js";
 
 // Recursive Zod Schema to strictly validate JSON payloads without any/unknown
-export const JsonSchema: z.ZodType<JsonValue> = z.lazy(() =>
+const JsonSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([
     z.string(),
     z.number(),
