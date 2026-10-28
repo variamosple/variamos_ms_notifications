@@ -1,14 +1,1 @@
-[
-  {
-    "id": "GHSA-JQCG-44MW-7W3H",
-    "package": "proxy-addr",
-    "reason": "corrigé dans la pile, à partir de chore/update-dev-tooling-2026-10",
-    "expires": "2026-11-30"
-  },
-  {
-    "id": "GHSA-68FV-2MGG-JV7Q",
-    "package": "source-map-js",
-    "reason": "corrigé dans la pile, à partir de chore/update-dev-tooling-2026-10",
-    "expires": "2026-11-30"
-  }
-]
+[]
