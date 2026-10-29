@@ -1,5 +1,5 @@
 import { SignJWT } from "jose";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ACCESS_TOKEN_AUDIENCE,
   ACCESS_TOKEN_ISSUER,
@@ -53,10 +53,6 @@ describe("AccessTokenVerifier", () => {
 
   beforeEach(() => {
     vi.stubEnv("NOTIFICATION_INTERNAL_TOKEN", INTERNAL_TOKEN);
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
   });
 
   it("returns the user of a valid token", async () => {

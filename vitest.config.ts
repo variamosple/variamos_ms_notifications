@@ -4,6 +4,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    // Variables and globals stubbed by vi.stubEnv and vi.stubGlobal come back
+    // after each test, whatever the test does (EV-53)
+    unstubEnvs: true,
+    unstubGlobals: true,
     exclude: [...configDefaults.exclude, "**/dist/**", "**/test/**"],
     coverage: {
       provider: "v8",

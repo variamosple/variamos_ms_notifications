@@ -21,7 +21,6 @@ const stubEnv = (env: Record<string, string | undefined>) => {
 
 describe("validateEnv", () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
