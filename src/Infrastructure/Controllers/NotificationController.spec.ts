@@ -68,7 +68,6 @@ describe("NotificationController HTTP contract", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.unstubAllEnvs();
     vi.stubEnv("NOTIFICATION_INTERNAL_TOKEN", INTERNAL_TOKEN);
   });
 

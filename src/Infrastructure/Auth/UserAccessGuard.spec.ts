@@ -59,7 +59,6 @@ describe("UserAccessGuard", () => {
   afterEach(async () => {
     await app?.close();
     vi.restoreAllMocks();
-    vi.unstubAllEnvs();
   });
 
   it("enforces access tokens now that clients send them", () => {
