@@ -61,9 +61,6 @@ class InMemoryNotifications implements INotificationRepository {
       if (n.deletedAt) this.rows.delete(n.id);
     }
   }
-  public async delete(id: string) {
-    this.rows.get(id)?.moveToTrash();
-  }
 }
 
 class InMemoryPreferences implements IUserPreferencesRepository {
