@@ -23,7 +23,11 @@
         "useImportType": "off"
       },
       "suspicious": {
-        "noExplicitAny": "error"
+        "noExplicitAny": "error",
+        "noSkippedTests": "error"
+      },
+      "complexity": {
+        "noExcessiveNestedTestSuites": "error"
       },
       "correctness": {
         "noUnusedVariables": "warn"
