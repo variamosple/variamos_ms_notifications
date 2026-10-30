@@ -71,7 +71,7 @@ export class SendNotificationUseCase {
     }
     const preferencesOf = (recipientId: string) =>
       preferencesByUser.get(recipientId) ??
-      new UserPreferences(recipientId, true, true, []);
+      UserPreferences.defaultsFor(recipientId);
 
     // 4. One notification per recipient who has not muted this event type
     const notifications = recipientIds

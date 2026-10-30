@@ -25,9 +25,16 @@ module.exports = {
       to: { dependencyTypesNot: ['local', 'core'] }
     },
     {
+      name: 'controllers-go-through-use-cases',
+      comment: 'A controller reaches the data through a use case, never through a repository or the persistence layer.',
+      severity: 'error',
+      from: { path: '^src/Infrastructure/Controllers', pathNot: TESTS },
+      to: { path: '^src/Domain/Repositories|^src/Infrastructure/Persistence' }
+    },
+    {
       name: 'no-circular-dependencies',
       comment: 'Forbidden circular dependencies that can corrupt execution.',
-      severity: 'warn',
+      severity: 'error',
       from: {},
       to: {
         circular: true

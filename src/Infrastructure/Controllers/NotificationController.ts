@@ -31,6 +31,10 @@ import {
   type RecipientQuery,
   RecipientQuerySchema,
 } from "../DTOs/QueryDtos.js";
+import {
+  toNotificationResponse,
+  toPreferencesResponse,
+} from "../DTOs/Responses.js";
 import type { SendNotificationDto } from "../DTOs/SendNotificationDto.js";
 import { SendNotificationSchema } from "../DTOs/SendNotificationDto.js";
 import type { UpdatePreferencesDto } from "../DTOs/UpdatePreferencesDto.js";
@@ -72,13 +76,14 @@ export class NotificationController {
   @UsePipes(new ZodValidationPipe(SendNotificationSchema))
   @HttpCode(HttpStatus.CREATED)
   public async send(@Body() dto: SendNotificationDto) {
-    return this.sendNotificationUseCase.execute({
+    const sent = await this.sendNotificationUseCase.execute({
       recipients: dto.recipients,
       templateKey: dto.templateKey,
       variables: dto.variables,
       metadata: dto.metadata,
       actorId: dto.actorId,
     });
+    return sent.map(toNotificationResponse);
   }
 
   @Get()
@@ -86,12 +91,13 @@ export class NotificationController {
     @CurrentPrincipal() principal: Principal | undefined,
     @Query(new ZodQueryPipe(InboxQuerySchema)) query: InboxQuery,
   ) {
-    return this.getInboxUseCase.execute({
+    const notifications = await this.getInboxUseCase.execute({
       recipientId: recipientOf(principal, query.recipientId) as string,
       page: query.page,
       limit: query.limit,
       folder: query.folder,
     });
+    return notifications.map(toNotificationResponse);
   }
 
   @Patch(":id/read")
@@ -99,7 +105,9 @@ export class NotificationController {
     @CurrentPrincipal() principal: Principal | undefined,
     @Param("id", new ParseUUIDPipe()) id: string,
   ) {
-    return this.markAsReadUseCase.execute(id, principal);
+    return toNotificationResponse(
+      await this.markAsReadUseCase.execute(id, principal),
+    );
   }
 
   @Patch("read-all")
@@ -138,8 +146,10 @@ export class NotificationController {
     @CurrentPrincipal() principal: Principal | undefined,
     @Query(new ZodQueryPipe(RecipientQuerySchema)) query: RecipientQuery,
   ) {
-    return this.managePreferencesUseCase.get(
-      recipientOf(principal, query.recipientId) as string,
+    return toPreferencesResponse(
+      await this.managePreferencesUseCase.get(
+        recipientOf(principal, query.recipientId) as string,
+      ),
     );
   }
 
@@ -150,9 +160,11 @@ export class NotificationController {
     @Body(new ZodValidationPipe(UpdatePreferencesSchema))
     dto: UpdatePreferencesDto,
   ) {
-    return this.managePreferencesUseCase.update(
-      recipientOf(principal, query.recipientId) as string,
-      dto,
+    return toPreferencesResponse(
+      await this.managePreferencesUseCase.update(
+        recipientOf(principal, query.recipientId) as string,
+        dto,
+      ),
     );
   }
 }

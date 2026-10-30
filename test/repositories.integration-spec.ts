@@ -262,7 +262,7 @@ describe("Repositories (Integration)", () => {
       expect(trashAfter).toHaveLength(0);
     });
 
-    it("should set deletedAt when deleting a notification", async () => {
+    it("saves the trash date of a notification moved to the trash", async () => {
       const notif = new Notification(
         "60000000-1234-5678-9012-36689f94b8cf",
         "user-1",
@@ -280,7 +280,8 @@ describe("Repositories (Integration)", () => {
       const foundBefore = await notificationRepo.findById("60000000-1234-5678-9012-36689f94b8cf");
       expect(foundBefore!.deletedAt).toBeNull();
 
-      await notificationRepo.delete("60000000-1234-5678-9012-36689f94b8cf");
+      foundBefore!.moveToTrash();
+      await notificationRepo.save(foundBefore!);
 
       const foundAfter = await notificationRepo.findById("60000000-1234-5678-9012-36689f94b8cf");
       expect(foundAfter!.deletedAt).toBeInstanceOf(Date);

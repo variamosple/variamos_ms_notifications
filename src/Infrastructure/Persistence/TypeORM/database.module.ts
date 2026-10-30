@@ -1,5 +1,10 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import {
+  NOTIFICATION_REPOSITORY,
+  NOTIFICATION_TEMPLATE_REPOSITORY,
+  USER_PREFERENCES_REPOSITORY,
+} from "../../Modules/injectionTokens.js";
 import { NotificationEntity } from "./Entities/NotificationEntity.js";
 import { NotificationTemplateEntity } from "./Entities/NotificationTemplateEntity.js";
 import { UserPreferencesEntity } from "./Entities/UserPreferencesEntity.js";
@@ -17,22 +22,22 @@ import { UserPreferencesTypeORMRepository } from "./Repositories/UserPreferences
   ],
   providers: [
     {
-      provide: "INotificationRepository",
+      provide: NOTIFICATION_REPOSITORY,
       useClass: NotificationTypeORMRepository,
     },
     {
-      provide: "INotificationTemplateRepository",
+      provide: NOTIFICATION_TEMPLATE_REPOSITORY,
       useClass: NotificationTemplateTypeORMRepository,
     },
     {
-      provide: "IUserPreferencesRepository",
+      provide: USER_PREFERENCES_REPOSITORY,
       useClass: UserPreferencesTypeORMRepository,
     },
   ],
   exports: [
-    "INotificationRepository",
-    "INotificationTemplateRepository",
-    "IUserPreferencesRepository",
+    NOTIFICATION_REPOSITORY,
+    NOTIFICATION_TEMPLATE_REPOSITORY,
+    USER_PREFERENCES_REPOSITORY,
     TypeOrmModule,
   ],
 })

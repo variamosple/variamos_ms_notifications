@@ -10,6 +10,8 @@ import {
   it,
   vi,
 } from "vitest";
+import { Notification } from "../../Domain/Entities/Notification.js";
+import { UserPreferences } from "../../Domain/Entities/UserPreferences.js";
 import { TemplateNotConfiguredError } from "../../Domain/Errors/NotificationErrors.js";
 import { DeleteNotificationUseCase } from "../../UseCases/DeleteNotificationUseCase.js";
 import { EmptyTrashUseCase } from "../../UseCases/EmptyTrashUseCase.js";
@@ -27,6 +29,33 @@ import { NotificationController } from "./NotificationController.js";
  */
 const INTERNAL_TOKEN = "test-internal-token";
 const N1 = "11111111-1111-4111-8111-111111111111";
+const CREATED = new Date("2026-10-29T10:00:00.000Z");
+const READ = new Date("2026-10-29T11:00:00.000Z");
+const readNotification = () =>
+  new Notification(
+    N1,
+    "user-1",
+    "admin-1",
+    "welcome",
+    { name: "Ana" },
+    { link: "/bugs" },
+    true,
+    READ,
+    CREATED,
+  );
+// Every field a client receives, in JSON
+const READ_NOTIFICATION_BODY = {
+  id: N1,
+  recipientId: "user-1",
+  actorId: "admin-1",
+  templateKey: "welcome",
+  variables: { name: "Ana" },
+  metadata: { link: "/bugs" },
+  isRead: true,
+  readAt: READ.toISOString(),
+  createdAt: CREATED.toISOString(),
+  deletedAt: null,
+};
 
 const useCases = {
   send: { execute: vi.fn() },
@@ -96,7 +125,7 @@ describe("NotificationController HTTP contract", () => {
     });
 
     it("sends a valid notification with defaults filled in", async () => {
-      useCases.send.execute.mockResolvedValue({ sent: 1 });
+      useCases.send.execute.mockResolvedValue([readNotification()]);
 
       const response = await http()
         .post("/notifications")
@@ -104,7 +133,7 @@ describe("NotificationController HTTP contract", () => {
         .send(body)
         .expect(HttpStatus.CREATED);
 
-      expect(response.body).toEqual({ sent: 1 });
+      expect(response.body).toEqual([READ_NOTIFICATION_BODY]);
       expect(useCases.send.execute).toHaveBeenCalledWith({
         recipients: { userIds: ["user-1"] },
         templateKey: "welcome",
@@ -202,7 +231,7 @@ describe("NotificationController HTTP contract", () => {
 
   describe("GET /notifications", () => {
     it("passes the recipient, page, limit and folder to the use case", async () => {
-      useCases.inbox.execute.mockResolvedValue({ data: [], total: 0 });
+      useCases.inbox.execute.mockResolvedValue([readNotification()]);
 
       const response = await asUser(
         http().get(
@@ -210,7 +239,7 @@ describe("NotificationController HTTP contract", () => {
         ),
       ).expect(HttpStatus.OK);
 
-      expect(response.body).toEqual({ data: [], total: 0 });
+      expect(response.body).toEqual([READ_NOTIFICATION_BODY]);
       expect(useCases.inbox.execute).toHaveBeenCalledWith({
         recipientId: "user-1",
         page: 2,
@@ -220,7 +249,7 @@ describe("NotificationController HTTP contract", () => {
     });
 
     it("uses page 1, limit 10 and the inbox by default", async () => {
-      useCases.inbox.execute.mockResolvedValue({ data: [], total: 0 });
+      useCases.inbox.execute.mockResolvedValue([]);
 
       await asUser(http().get("/notifications?recipientId=user-1")).expect(
         HttpStatus.OK,
@@ -249,7 +278,7 @@ describe("NotificationController HTTP contract", () => {
     });
 
     it("accepts the largest page size", async () => {
-      useCases.inbox.execute.mockResolvedValue({ data: [], total: 0 });
+      useCases.inbox.execute.mockResolvedValue([]);
 
       await asUser(
         http().get("/notifications?recipientId=user-1&limit=100"),
@@ -263,16 +292,13 @@ describe("NotificationController HTTP contract", () => {
 
   describe("PATCH /notifications/:id/read", () => {
     it("marks the notification as read and returns the use case result", async () => {
-      useCases.markAsRead.execute.mockResolvedValue({
-        id: N1,
-        isRead: true,
-      });
+      useCases.markAsRead.execute.mockResolvedValue(readNotification());
 
       const response = await asUser(
         http().patch(`/notifications/${N1}/read`),
       ).expect(HttpStatus.OK);
 
-      expect(response.body).toEqual({ id: N1, isRead: true });
+      expect(response.body).toEqual(READ_NOTIFICATION_BODY);
       expect(useCases.markAsRead.execute).toHaveBeenCalledWith(N1, undefined);
     });
   });
@@ -327,18 +353,27 @@ describe("NotificationController HTTP contract", () => {
 
   describe("/notifications/preferences", () => {
     it("GET returns the recipient's preferences", async () => {
-      useCases.preferences.get.mockResolvedValue({ inAppEnabled: true });
+      useCases.preferences.get.mockResolvedValue(
+        new UserPreferences("user-1", false, true, ["bug"]),
+      );
 
       const response = await asUser(
         http().get("/notifications/preferences?recipientId=user-1"),
       ).expect(HttpStatus.OK);
 
-      expect(response.body).toEqual({ inAppEnabled: true });
+      expect(response.body).toEqual({
+        userId: "user-1",
+        emailEnabled: false,
+        inAppEnabled: true,
+        mutedEventTypes: ["bug"],
+      });
       expect(useCases.preferences.get).toHaveBeenCalledWith("user-1");
     });
 
     it("PATCH updates the preferences", async () => {
-      useCases.preferences.update.mockResolvedValue({ emailEnabled: false });
+      useCases.preferences.update.mockResolvedValue(
+        UserPreferences.defaultsFor("user-1"),
+      );
 
       await asUser(
         http()

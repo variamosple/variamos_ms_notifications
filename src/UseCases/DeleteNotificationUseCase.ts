@@ -14,6 +14,7 @@ export class DeleteNotificationUseCase {
     if (!notification || (actor && !notification.belongsTo(actor.userId))) {
       throw new NotificationNotFoundError(id);
     }
-    await this.notificationRepo.delete(id);
+    notification.moveToTrash();
+    await this.notificationRepo.save(notification);
   }
 }

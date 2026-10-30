@@ -19,8 +19,8 @@ import {
 import { AccessTokenVerifier } from "./AccessTokenVerifier.js";
 import { UserAccessGuard } from "./UserAccessGuard.js";
 
-const inbox = { execute: vi.fn().mockResolvedValue({ data: [], total: 0 }) };
-const send = { execute: vi.fn().mockResolvedValue({ sent: 1 }) };
+const inbox = { execute: vi.fn().mockResolvedValue([]) };
+const send = { execute: vi.fn().mockResolvedValue([]) };
 const verifier = {
   verify: vi.fn(async (token: string | null | undefined) =>
     token === "valid-token" ? { userId: "user-42" } : null,

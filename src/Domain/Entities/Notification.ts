@@ -8,30 +8,43 @@ export class Notification {
     public readonly templateKey: string,
     public readonly variables: Record<string, JsonValue>,
     public readonly metadata: Record<string, JsonValue>,
-    public isRead: boolean,
-    public readAt: Date | null,
+    // Read and trash state change only through the methods below
+    private read: boolean,
+    private readTime: Date | null,
     public readonly createdAt: Date,
-    public deletedAt: Date | null = null,
+    private trashTime: Date | null = null,
   ) {}
+
+  public get isRead(): boolean {
+    return this.read;
+  }
+
+  public get readAt(): Date | null {
+    return this.readTime;
+  }
+
+  public get deletedAt(): Date | null {
+    return this.trashTime;
+  }
 
   public belongsTo(userId: string): boolean {
     return this.recipientId === userId;
   }
 
   public markAsRead(): void {
-    if (!this.isRead) {
-      this.isRead = true;
-      this.readAt = new Date();
+    if (!this.read) {
+      this.read = true;
+      this.readTime = new Date();
     }
   }
 
   public moveToTrash(): void {
-    if (!this.deletedAt) {
-      this.deletedAt = new Date();
+    if (!this.trashTime) {
+      this.trashTime = new Date();
     }
   }
 
   public restoreFromTrash(): void {
-    this.deletedAt = null;
+    this.trashTime = null;
   }
 }
