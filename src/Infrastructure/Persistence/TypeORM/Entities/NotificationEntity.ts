@@ -16,6 +16,10 @@ import { JsonValue } from "../../../../Domain/Entities/JsonValue.js";
 @Index("idx_notifications_deleted_at", ["deletedAt"], {
   where: "(deleted_at IS NULL)",
 })
+// The inbox, newest first (migration InboxIndex1793577600000, EV-101)
+@Index("idx_notifications_inbox", ["recipientId", "createdAt"], {
+  where: "(deleted_at IS NULL)",
+})
 export class NotificationEntity {
   @PrimaryColumn({
     type: "uuid",

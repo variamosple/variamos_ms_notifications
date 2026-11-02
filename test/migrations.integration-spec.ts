@@ -1,26 +1,39 @@
 import { readFileSync } from "node:fs";
-import { PostgreSqlContainer, StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import {
+  PostgreSqlContainer,
+  StartedPostgreSqlContainer,
+} from "@testcontainers/postgresql";
 import { DataSource, DataSourceOptions } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { NotificationEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/NotificationEntity.js";
 import { NotificationTemplateEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/NotificationTemplateEntity.js";
 import { UserPreferencesEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/UserPreferencesEntity.js";
+import { INBOX_INDEX } from "../src/Infrastructure/Persistence/TypeORM/Migrations/1793577600000-InboxIndex.js";
 import {
   NOTIFICATIONS_MIGRATIONS,
   NOTIFICATIONS_MIGRATIONS_TABLE,
 } from "../src/Infrastructure/Persistence/TypeORM/Migrations/index.js";
 
-const ENTITIES = [NotificationEntity, NotificationTemplateEntity, UserPreferencesEntity];
+const ENTITIES = [
+  NotificationEntity,
+  NotificationTemplateEntity,
+  UserPreferencesEntity,
+];
 
 const productionSchema = (schema: string) =>
-  readFileSync(new URL("./fixtures/production-schema-2026-10-18.sql", import.meta.url), "utf8")
-    .replaceAll("variamos.", `"${schema}".`);
+  readFileSync(
+    new URL("./fixtures/production-schema-2026-10-18.sql", import.meta.url),
+    "utf8",
+  ).replaceAll("variamos.", `"${schema}".`);
 
 describe("Schema migrations (Integration)", () => {
   let container: StartedPostgreSqlContainer;
   const open: DataSource[] = [];
 
-  const connect = async (schema: string, extra: Partial<DataSourceOptions> = {}) => {
+  const connect = async (
+    schema: string,
+    extra: Partial<DataSourceOptions> = {},
+  ) => {
     const dataSource = new DataSource({
       type: "postgres",
       host: container.getHost(),
@@ -41,7 +54,9 @@ describe("Schema migrations (Integration)", () => {
 
   // What synchronize would still change: nothing when migrations match the entities
   const pendingSchemaChanges = async (dataSource: DataSource) =>
-    (await dataSource.driver.createSchemaBuilder().log()).upQueries.map((q) => q.query);
+    (await dataSource.driver.createSchemaBuilder().log()).upQueries.map(
+      (q) => q.query,
+    );
 
   const tablesOf = async (dataSource: DataSource, schema: string) =>
     (
@@ -69,7 +84,10 @@ describe("Schema migrations (Integration)", () => {
         [schema, NOTIFICATIONS_MIGRATIONS_TABLE],
       )
       .then((rows: { on_table: string }[]) =>
-        rows.map((row) => ({ ...row, on_table: row.on_table.replace(/^.*\./, "") })),
+        rows.map((row) => ({
+          ...row,
+          on_table: row.on_table.replace(/^.*\./, ""),
+        })),
       ),
     indexes: await dataSource.query(
       `SELECT indexname, replace(indexdef, $1 || '.', '') AS def
@@ -82,7 +100,9 @@ describe("Schema migrations (Integration)", () => {
     // Production runs PostgreSQL 14
     container = await new PostgreSqlContainer("postgres:14-alpine").start();
     const admin = await connect("public");
-    await admin.query('CREATE SCHEMA "fresh"; CREATE SCHEMA "legacy"; CREATE SCHEMA "rerun"');
+    await admin.query(
+      'CREATE SCHEMA "fresh"; CREATE SCHEMA "legacy"; CREATE SCHEMA "rerun"',
+    );
   }, 60000);
 
   afterAll(async () => {
@@ -97,7 +117,10 @@ describe("Schema migrations (Integration)", () => {
 
     const applied = await dataSource.runMigrations();
 
-    expect(applied.map((m) => m.name)).toEqual(["Baseline1792281600000"]);
+    expect(applied.map((m) => m.name)).toEqual([
+      "Baseline1792281600000",
+      "InboxIndex1793577600000",
+    ]);
     expect(await pendingSchemaChanges(dataSource)).toEqual([]);
     expect(await tablesOf(dataSource, "fresh")).toEqual([
       "notification_templates",
@@ -122,15 +145,29 @@ describe("Schema migrations (Integration)", () => {
     await before.destroy();
 
     const dataSource = await connect("legacy");
-    expect(await dataSource.runMigrations()).toHaveLength(1);
+    expect(await dataSource.runMigrations()).toHaveLength(2);
 
-    expect(await structureOf(dataSource, "legacy")).toEqual(structureBefore);
+    // The same tables and rows; only the inbox index is new
+    const structureAfter = await structureOf(dataSource, "legacy");
+    expect(
+      structureAfter.indexes.map((i: { indexname: string }) => i.indexname),
+    ).toContain(INBOX_INDEX);
+    expect({
+      ...structureAfter,
+      indexes: structureAfter.indexes.filter(
+        (i: { indexname: string }) => i.indexname !== INBOX_INDEX,
+      ),
+    }).toEqual(structureBefore);
     expect(await pendingSchemaChanges(dataSource)).toEqual([]);
     expect(
-      await dataSource.query('SELECT "recipient_id", "variables" FROM "legacy"."notifications"'),
+      await dataSource.query(
+        'SELECT "recipient_id", "variables" FROM "legacy"."notifications"',
+      ),
     ).toEqual([{ recipient_id: "user-1", variables: { name: "Ada" } }]);
     expect(
-      await dataSource.query('SELECT "muted_event_types" FROM "legacy"."user_preferences"'),
+      await dataSource.query(
+        'SELECT "muted_event_types" FROM "legacy"."user_preferences"',
+      ),
     ).toEqual([{ muted_event_types: ["bug"] }]);
   });
 
@@ -138,7 +175,9 @@ describe("Schema migrations (Integration)", () => {
     const fresh = await connect("fresh");
     const legacy = await connect("legacy");
 
-    expect(await structureOf(fresh, "fresh")).toEqual(await structureOf(legacy, "legacy"));
+    expect(await structureOf(fresh, "fresh")).toEqual(
+      await structureOf(legacy, "legacy"),
+    );
   });
 
   it("applies each migration once", async () => {
@@ -150,12 +189,23 @@ describe("Schema migrations (Integration)", () => {
 
     expect(await second.runMigrations()).toEqual([]);
     expect(
-      await second.query(`SELECT count(*)::int AS n FROM "rerun"."${NOTIFICATIONS_MIGRATIONS_TABLE}"`),
-    ).toEqual([{ n: 1 }]);
+      await second.query(
+        `SELECT count(*)::int AS n FROM "rerun"."${NOTIFICATIONS_MIGRATIONS_TABLE}"`,
+      ),
+    ).toEqual([{ n: NOTIFICATIONS_MIGRATIONS.length }]);
   });
 
-  it("refuses to revert the baseline", async () => {
+  it("drops the inbox index when reverted, then refuses to revert the baseline", async () => {
     const dataSource = await connect("fresh");
+    const inboxIndexes = () =>
+      dataSource.query(
+        `SELECT indexname FROM pg_indexes WHERE schemaname = 'fresh' AND indexname = $1`,
+        [INBOX_INDEX],
+      );
+    expect(await inboxIndexes()).toHaveLength(1);
+
+    await dataSource.undoLastMigration();
+    expect(await inboxIndexes()).toEqual([]);
 
     await expect(dataSource.undoLastMigration()).rejects.toThrow(
       "The baseline migration cannot be reverted.",
