@@ -1,3 +1,12 @@
+/**
+ * Former preference keys, still sent by the settings screen of
+ * variamos-components before its EV-99 version: "System Alerts" saved
+ * system_alert, while the admin service sends admin_alert.
+ */
+const FORMER_KEYS: Readonly<Record<string, string>> = {
+  system_alert: "admin_alert",
+};
+
 export class UserPreferences {
   private muted: string[];
 
@@ -29,7 +38,7 @@ export class UserPreferences {
   }
 
   public isMuted(eventType: string): boolean {
-    return this.muted.includes(eventType);
+    return this.muted.some((key) => (FORMER_KEYS[key] ?? key) === eventType);
   }
 
   public enableEmail(): void {
