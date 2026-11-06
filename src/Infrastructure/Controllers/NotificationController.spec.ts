@@ -140,6 +140,7 @@ describe("NotificationController HTTP contract", () => {
         variables: { name: "Ana" },
         metadata: {},
         actorId: undefined,
+        mandatory: false,
       });
     });
 
