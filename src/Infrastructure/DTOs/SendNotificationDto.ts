@@ -84,6 +84,9 @@ export const SendNotificationSchema = z.object({
   variables: BoundedJsonRecord.default({}),
   metadata: BoundedJsonRecord.default({}),
   actorId: Identifier.nullable().optional(),
+  // Sent whatever the recipients muted; for the security alerts of the
+  // admin service (EV-99). Only the internal callers reach this route.
+  mandatory: z.boolean().default(false),
 });
 
 export type SendNotificationDto = z.infer<typeof SendNotificationSchema>;

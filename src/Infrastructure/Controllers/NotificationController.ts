@@ -82,6 +82,7 @@ export class NotificationController {
       variables: dto.variables,
       metadata: dto.metadata,
       actorId: dto.actorId,
+      mandatory: dto.mandatory,
     });
     return sent.map(toNotificationResponse);
   }
