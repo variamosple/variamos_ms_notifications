@@ -1,8 +1,10 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { INestApplication, HttpStatus } from "@nestjs/common";
+import { HttpStatus } from "@nestjs/common";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import request from "supertest";
 import { io, Socket } from "socket.io-client";
 import { AppModule } from "./../src/app.module.js";
+import { configureApplication } from "../src/Infrastructure/Config/configureApplication.js";
 import { DbTestHelper } from "./db-test-helper.js";
 import { NotificationTemplate } from "../src/Domain/Entities/NotificationTemplate.js";
 import { NotificationTemplateEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/NotificationTemplateEntity.js";
@@ -23,7 +25,7 @@ interface PostgresOptions {
 }
 
 describe("AppModule (e2e)", () => {
-  let app: INestApplication;
+  let app: NestExpressApplication;
   let dbHelper: DbTestHelper;
   let dataSource: DataSource;
   const internalToken = "super-secret-internal-token";
@@ -62,7 +64,9 @@ describe("AppModule (e2e)", () => {
       imports: [AppModule],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
+    // Built as main.ts builds it: hardening and socket adapter included
+    app = moduleFixture.createNestApplication<NestExpressApplication>();
+    configureApplication(app);
     await app.init();
 
     // Create a default template in the database for the tests
@@ -86,6 +90,16 @@ describe("AppModule (e2e)", () => {
 
   it("should initialize the application successfully", () => {
     expect(app).toBeDefined();
+  });
+
+  it("answers with the settings of main.ts: security headers, body limit (TST-NOTIF-07)", async () => {
+    const response = await request(app.getHttpServer())
+      .post("/notifications")
+      .set("x-internal-token", internalToken)
+      .send({ padding: "x".repeat(150 * 1024) })
+      .expect(HttpStatus.PAYLOAD_TOO_LARGE);
+
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
   });
 
   describe("HTTP API", () => {

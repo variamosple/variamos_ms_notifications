@@ -161,6 +161,31 @@ describe("SendNotificationUseCase", () => {
     expect(notificationChannel.send).toHaveBeenCalledTimes(1);
   });
 
+  it("delivers a mandatory notification to a recipient who muted it (EV-99)", async () => {
+    templateRepo.findByKey.mockResolvedValue(
+      new NotificationTemplate("admin_alert", "Alert", "Body", new Date()),
+    );
+    preferencesRepo.findByUserIds.mockResolvedValue([
+      new UserPreferences("user-1", true, true, ["admin_alert"]),
+      new UserPreferences("user-2", true, true, ["system_alert"]),
+    ]);
+    notificationRepo.saveMany.mockImplementation(async (batch) => batch);
+    const send = (mandatory?: boolean) =>
+      useCase.execute({
+        recipients: { userIds: ["user-1", "user-2"] },
+        templateKey: "admin_alert",
+        variables: {},
+        metadata: {},
+        mandatory,
+      });
+
+    expect(await send()).toEqual([]);
+    expect((await send(true)).map((n) => n.recipientId)).toEqual([
+      "user-1",
+      "user-2",
+    ]);
+  });
+
   it("should use default preferences if user preferences are not found in database", async () => {
     const template = new NotificationTemplate(
       "review_assigned",

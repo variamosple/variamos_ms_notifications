@@ -83,3 +83,21 @@ describe("SendNotificationSchema recipients", () => {
     expect(result.error?.issues[0].path).toEqual(["recipients", "roles"]);
   });
 });
+
+describe("SendNotificationSchema mandatory (EV-99)", () => {
+  const send = (extra: Record<string, unknown>) =>
+    SendNotificationSchema.safeParse({
+      recipients: { userIds: ["user-1"] },
+      templateKey: "admin_alert",
+      ...extra,
+    });
+
+  it("leaves a notification mutable unless told otherwise", () => {
+    expect(send({}).data?.mandatory).toBe(false);
+    expect(send({ mandatory: true }).data?.mandatory).toBe(true);
+  });
+
+  it("refuses a value that is not a boolean", () => {
+    expect(send({ mandatory: "yes" }).success).toBe(false);
+  });
+});

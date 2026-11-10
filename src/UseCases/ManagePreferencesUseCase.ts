@@ -15,7 +15,7 @@ export class ManagePreferencesUseCase {
     requireRecipient(userId);
     const preferences = await this.preferencesRepo.findByUserId(userId);
     if (!preferences) {
-      return new UserPreferences(userId, true, true, []);
+      return UserPreferences.defaultsFor(userId);
     }
     return preferences;
   }
@@ -28,7 +28,7 @@ export class ManagePreferencesUseCase {
     let preferences = await this.preferencesRepo.findByUserId(userId);
 
     if (!preferences) {
-      preferences = new UserPreferences(userId, true, true, []);
+      preferences = UserPreferences.defaultsFor(userId);
     }
 
     if (input.emailEnabled !== undefined) {
@@ -48,7 +48,7 @@ export class ManagePreferencesUseCase {
     }
 
     if (input.mutedEventTypes !== undefined) {
-      preferences.mutedEventTypes = [...input.mutedEventTypes];
+      preferences.muteOnly(input.mutedEventTypes);
     }
 
     return this.preferencesRepo.save(preferences);

@@ -2,7 +2,7 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import helmet from "helmet";
 import { HTTP_CORS_OPTIONS } from "./allowedOrigins.js";
 
-export const JSON_BODY_LIMIT = "100kb";
+const JSON_BODY_LIMIT = "100kb";
 
 /**
  * HTTP settings of the service, shared by main.ts and the tests:

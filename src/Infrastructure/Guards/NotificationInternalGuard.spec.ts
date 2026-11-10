@@ -1,5 +1,5 @@
 import { ExecutionContext, UnauthorizedException } from "@nestjs/common";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NotificationInternalGuard } from "./NotificationInternalGuard.js";
 
 describe("NotificationInternalGuard", () => {
@@ -8,7 +8,7 @@ describe("NotificationInternalGuard", () => {
 
   beforeEach(() => {
     guard = new NotificationInternalGuard();
-    process.env.NOTIFICATION_INTERNAL_TOKEN = mockToken;
+    vi.stubEnv("NOTIFICATION_INTERNAL_TOKEN", mockToken);
   });
 
   const createMockContext = (
@@ -46,7 +46,7 @@ describe("NotificationInternalGuard", () => {
   });
 
   it("should refuse every token when none is configured", () => {
-    delete process.env.NOTIFICATION_INTERNAL_TOKEN;
+    vi.stubEnv("NOTIFICATION_INTERNAL_TOKEN", undefined);
     const context = createMockContext("any-token");
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
   });

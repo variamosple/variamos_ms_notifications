@@ -30,6 +30,13 @@ import {
   NotificationGateway,
   RootNotificationGateway,
 } from "../WebSockets/NotificationGateway.js";
+import {
+  NOTIFICATION_CHANNEL,
+  NOTIFICATION_REPOSITORY,
+  NOTIFICATION_TEMPLATE_REPOSITORY,
+  USER_PREFERENCES_REPOSITORY,
+  USER_SERVICE,
+} from "./injectionTokens.js";
 
 @Module({
   imports: [DatabaseModule, ThrottlerModule.forRoot([RATE_LIMIT])],
@@ -45,11 +52,11 @@ import {
     RootNotificationGateway,
     NotificationGateway,
     {
-      provide: "INotificationChannel",
+      provide: NOTIFICATION_CHANNEL,
       useExisting: NotificationGateway,
     },
     {
-      provide: "IUserService",
+      provide: USER_SERVICE,
       useClass: UserServiceHttpClient,
     },
     // Factory Providers for Use Cases to decouple them from NestJS framework
@@ -70,48 +77,48 @@ import {
           notificationChannel,
         ),
       inject: [
-        "INotificationRepository",
-        "IUserPreferencesRepository",
-        "INotificationTemplateRepository",
-        "IUserService",
-        "INotificationChannel",
+        NOTIFICATION_REPOSITORY,
+        USER_PREFERENCES_REPOSITORY,
+        NOTIFICATION_TEMPLATE_REPOSITORY,
+        USER_SERVICE,
+        NOTIFICATION_CHANNEL,
       ],
     },
     {
       provide: GetInboxUseCase,
       useFactory: (notificationRepo: INotificationRepository) =>
         new GetInboxUseCase(notificationRepo),
-      inject: ["INotificationRepository"],
+      inject: [NOTIFICATION_REPOSITORY],
     },
     {
       provide: MarkAsReadUseCase,
       useFactory: (notificationRepo: INotificationRepository) =>
         new MarkAsReadUseCase(notificationRepo),
-      inject: ["INotificationRepository"],
+      inject: [NOTIFICATION_REPOSITORY],
     },
     {
       provide: MarkAllAsReadUseCase,
       useFactory: (notificationRepo: INotificationRepository) =>
         new MarkAllAsReadUseCase(notificationRepo),
-      inject: ["INotificationRepository"],
+      inject: [NOTIFICATION_REPOSITORY],
     },
     {
       provide: EmptyTrashUseCase,
       useFactory: (notificationRepo: INotificationRepository) =>
         new EmptyTrashUseCase(notificationRepo),
-      inject: ["INotificationRepository"],
+      inject: [NOTIFICATION_REPOSITORY],
     },
     {
       provide: DeleteNotificationUseCase,
       useFactory: (notificationRepo: INotificationRepository) =>
         new DeleteNotificationUseCase(notificationRepo),
-      inject: ["INotificationRepository"],
+      inject: [NOTIFICATION_REPOSITORY],
     },
     {
       provide: ManagePreferencesUseCase,
       useFactory: (preferencesRepo: IUserPreferencesRepository) =>
         new ManagePreferencesUseCase(preferencesRepo),
-      inject: ["IUserPreferencesRepository"],
+      inject: [USER_PREFERENCES_REPOSITORY],
     },
   ],
 })

@@ -15,6 +15,6 @@ export function toPersistence(domain: UserPreferences): UserPreferencesEntity {
   entity.userId = domain.userId;
   entity.emailEnabled = domain.emailEnabled;
   entity.inAppEnabled = domain.inAppEnabled;
-  entity.mutedEventTypes = domain.mutedEventTypes;
+  entity.mutedEventTypes = [...domain.mutedEventTypes];
   return entity;
 }

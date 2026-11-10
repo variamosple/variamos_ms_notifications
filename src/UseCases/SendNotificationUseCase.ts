@@ -18,6 +18,8 @@ export interface SendNotificationInput {
   variables: Record<string, JsonValue>;
   metadata: Record<string, JsonValue>;
   actorId?: string | null;
+  // Delivered whatever the recipient muted: a security alert (EV-99)
+  mandatory?: boolean;
 }
 
 // Recipients read and notifications inserted per database round trip
@@ -71,12 +73,15 @@ export class SendNotificationUseCase {
     }
     const preferencesOf = (recipientId: string) =>
       preferencesByUser.get(recipientId) ??
-      new UserPreferences(recipientId, true, true, []);
+      UserPreferences.defaultsFor(recipientId);
 
-    // 4. One notification per recipient who has not muted this event type
+    // 4. One notification per recipient who has not muted this event
+    // type, or per recipient when the notification is mandatory
     const notifications = recipientIds
       .filter(
-        (recipientId) => !preferencesOf(recipientId).isMuted(input.templateKey),
+        (recipientId) =>
+          input.mandatory === true ||
+          !preferencesOf(recipientId).isMuted(input.templateKey),
       )
       .map(
         (recipientId) =>

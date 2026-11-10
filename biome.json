@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -23,7 +23,11 @@
         "useImportType": "off"
       },
       "suspicious": {
-        "noExplicitAny": "error"
+        "noExplicitAny": "error",
+        "noSkippedTests": "error"
+      },
+      "complexity": {
+        "noExcessiveNestedTestSuites": "error"
       },
       "correctness": {
         "noUnusedVariables": "warn"

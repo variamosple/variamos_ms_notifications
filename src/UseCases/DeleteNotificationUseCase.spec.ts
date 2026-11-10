@@ -21,7 +21,7 @@ describe("DeleteNotificationUseCase", () => {
     );
   });
 
-  it("should call delete on repository if notification is found", async () => {
+  it("moves the notification to the trash and saves it", async () => {
     const notif = new Notification(
       "id-1",
       "user-1",
@@ -35,10 +35,11 @@ describe("DeleteNotificationUseCase", () => {
     );
 
     notificationRepo.findById.mockResolvedValue(notif);
-    notificationRepo.delete.mockResolvedValue(undefined);
+    notificationRepo.save.mockImplementation(async (n) => n);
 
     await useCase.execute("id-1");
 
-    expect(notificationRepo.delete).toHaveBeenCalledWith("id-1");
+    expect(notificationRepo.save).toHaveBeenCalledWith(notif);
+    expect(notif.deletedAt).toBeInstanceOf(Date);
   });
 });
