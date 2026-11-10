@@ -20,6 +20,9 @@ export interface SendNotificationInput {
   actorId?: string | null;
   // Delivered whatever the recipient muted: a security alert (EV-99)
   mandatory?: boolean;
+  // Key of the send, chosen by its sender: sent again with the same key,
+  // it gives nothing twice to a recipient (EV-99, CA-NT-05)
+  eventId?: string | null;
 }
 
 // Recipients read and notifications inserted per database round trip
@@ -96,12 +99,15 @@ export class SendNotificationUseCase {
             null, // readAt
             new Date(), // createdAt
             null, // deletedAt
+            input.eventId ?? null,
           ),
       );
 
     // 5. Save by batch, then send each saved batch to the active channels
     // (WebSocket): a notification is never sent before it is saved. A failed
     // batch stops the dispatch; the batches before it stay saved and sent.
+    // Sent again with its key, the dispatch completes the recipients left
+    // out, and gives nothing again to the others: saveMany leaves them out.
     const createdNotifications: Notification[] = [];
     for (const batch of chunks(notifications, DISPATCH_BATCH_SIZE)) {
       const saved = await this.notificationRepo.saveMany(batch);

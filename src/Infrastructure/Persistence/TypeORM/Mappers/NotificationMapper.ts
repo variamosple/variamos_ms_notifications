@@ -13,6 +13,7 @@ export function toDomain(entity: NotificationEntity): Notification {
     entity.readAt,
     entity.createdAt,
     entity.deletedAt,
+    entity.eventId ?? null,
   );
 }
 
@@ -28,5 +29,6 @@ export function toPersistence(domain: Notification): NotificationEntity {
   entity.readAt = domain.readAt;
   entity.createdAt = domain.createdAt;
   entity.deletedAt = domain.deletedAt;
+  entity.eventId = domain.eventId;
   return entity;
 }

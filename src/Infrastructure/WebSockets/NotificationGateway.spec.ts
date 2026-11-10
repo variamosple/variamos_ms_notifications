@@ -164,6 +164,9 @@ describe("NotificationGateway.send", () => {
     expect(namespace.emit).toHaveBeenCalledWith("notification", payload);
     expect(rootServer.to).toHaveBeenCalledWith("user-1");
     expect(rootServer.emit).toHaveBeenCalledWith("notification", payload);
+    // Once per namespace: a client connected to one receives it once
+    expect(namespace.emit).toHaveBeenCalledTimes(1);
+    expect(rootServer.emit).toHaveBeenCalledTimes(1);
   });
 
   it("does not expose the recipient or the actor in the payload", async () => {

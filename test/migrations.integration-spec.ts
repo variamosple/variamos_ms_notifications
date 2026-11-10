@@ -9,6 +9,8 @@ import { NotificationEntity } from "../src/Infrastructure/Persistence/TypeORM/En
 import { NotificationTemplateEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/NotificationTemplateEntity.js";
 import { UserPreferencesEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/UserPreferencesEntity.js";
 import { INBOX_INDEX } from "../src/Infrastructure/Persistence/TypeORM/Migrations/1793577600000-InboxIndex.js";
+import { EVENT_RECIPIENT_INDEX } from "../src/Infrastructure/Persistence/TypeORM/Migrations/1794268800000-NotificationEventId.js";
+import { PLATFORM_TEMPLATES } from "../src/Infrastructure/Persistence/TypeORM/Migrations/1794268800001-NotificationTemplates.js";
 import {
   NOTIFICATIONS_MIGRATIONS,
   NOTIFICATIONS_MIGRATIONS_TABLE,
@@ -120,6 +122,8 @@ describe("Schema migrations (Integration)", () => {
     expect(applied.map((m) => m.name)).toEqual([
       "Baseline1792281600000",
       "InboxIndex1793577600000",
+      "NotificationEventId1794268800000",
+      "NotificationTemplates1794268800001",
     ]);
     expect(await pendingSchemaChanges(dataSource)).toEqual([]);
     expect(await tablesOf(dataSource, "fresh")).toEqual([
@@ -128,6 +132,15 @@ describe("Schema migrations (Integration)", () => {
       "notifications_migrations",
       "user_preferences",
     ]);
+    // A new database accepts the sends of the platform (EV-99)
+    expect(
+      await dataSource.query(
+        'SELECT "key" FROM "fresh"."notification_templates" ORDER BY 1',
+      ),
+    ).toEqual(
+      PLATFORM_TEMPLATES.map((t) => ({ key: t.key }))
+        .sort((a, b) => a.key.localeCompare(b.key)),
+    );
   });
 
   it("leaves the production tables and their rows untouched", async () => {
@@ -141,21 +154,42 @@ describe("Schema migrations (Integration)", () => {
     await before.query(
       `INSERT INTO "legacy"."user_preferences" ("user_id", "muted_event_types") VALUES ('user-1', '{bug}')`,
     );
+    // A template made by hand in production, with its own texts
+    await before.query(
+      `INSERT INTO "legacy"."notification_templates" ("key", "title_template", "body_template") VALUES ('admin_alert', 'Alert: {{title}}', '{{body}}')`,
+    );
     const structureBefore = await structureOf(before, "legacy");
     await before.destroy();
 
     const dataSource = await connect("legacy");
-    expect(await dataSource.runMigrations()).toHaveLength(2);
+    expect(await dataSource.runMigrations()).toHaveLength(4);
 
-    // The same tables and rows; only the inbox index is new
+    // The same tables and rows; only the inbox index, the send key column
+    // and its index are new
+    const added = [INBOX_INDEX, EVENT_RECIPIENT_INDEX];
     const structureAfter = await structureOf(dataSource, "legacy");
     expect(
       structureAfter.indexes.map((i: { indexname: string }) => i.indexname),
-    ).toContain(INBOX_INDEX);
+    ).toEqual(expect.arrayContaining(added));
+    expect(
+      structureAfter.columns.filter(
+        (c: { column_name: string }) => c.column_name === "event_id",
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        table_name: "notifications",
+        character_maximum_length: 128,
+        is_nullable: "YES",
+        column_default: null,
+      }),
+    ]);
     expect({
       ...structureAfter,
+      columns: structureAfter.columns.filter(
+        (c: { column_name: string }) => c.column_name !== "event_id",
+      ),
       indexes: structureAfter.indexes.filter(
-        (i: { indexname: string }) => i.indexname !== INBOX_INDEX,
+        (i: { indexname: string }) => !added.includes(i.indexname),
       ),
     }).toEqual(structureBefore);
     expect(await pendingSchemaChanges(dataSource)).toEqual([]);
@@ -169,6 +203,17 @@ describe("Schema migrations (Integration)", () => {
         'SELECT "muted_event_types" FROM "legacy"."user_preferences"',
       ),
     ).toEqual([{ muted_event_types: ["bug"] }]);
+    // The template made by hand is kept; the missing ones are added
+    expect(
+      await dataSource.query(
+        `SELECT "title_template" FROM "legacy"."notification_templates" WHERE "key" = 'admin_alert'`,
+      ),
+    ).toEqual([{ title_template: "Alert: {{title}}" }]);
+    expect(
+      await dataSource.query(
+        'SELECT count(*)::int AS n FROM "legacy"."notification_templates"',
+      ),
+    ).toEqual([{ n: PLATFORM_TEMPLATES.length }]);
   });
 
   it("gives a new database the same structure as production", async () => {
@@ -195,17 +240,37 @@ describe("Schema migrations (Integration)", () => {
     ).toEqual([{ n: NOTIFICATIONS_MIGRATIONS.length }]);
   });
 
-  it("drops the inbox index when reverted, then refuses to revert the baseline", async () => {
+  it("reverts each migration in turn, then refuses to revert the baseline", async () => {
     const dataSource = await connect("fresh");
-    const inboxIndexes = () =>
+    const indexes = (name: string) =>
       dataSource.query(
         `SELECT indexname FROM pg_indexes WHERE schemaname = 'fresh' AND indexname = $1`,
-        [INBOX_INDEX],
+        [name],
       );
-    expect(await inboxIndexes()).toHaveLength(1);
+    const templateCount = async () =>
+      (
+        await dataSource.query(
+          'SELECT count(*)::int AS n FROM "fresh"."notification_templates"',
+        )
+      )[0].n;
+    const eventIdColumns = () =>
+      dataSource.query(
+        `SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'fresh' AND table_name = 'notifications' AND column_name = 'event_id'`,
+      );
+    expect(await indexes(INBOX_INDEX)).toHaveLength(1);
+    expect(await indexes(EVENT_RECIPIENT_INDEX)).toHaveLength(1);
+
+    // The templates stay: they may have been there before
+    await dataSource.undoLastMigration();
+    expect(await templateCount()).toBe(PLATFORM_TEMPLATES.length);
 
     await dataSource.undoLastMigration();
-    expect(await inboxIndexes()).toEqual([]);
+    expect(await indexes(EVENT_RECIPIENT_INDEX)).toEqual([]);
+    expect(await eventIdColumns()).toEqual([]);
+
+    await dataSource.undoLastMigration();
+    expect(await indexes(INBOX_INDEX)).toEqual([]);
 
     await expect(dataSource.undoLastMigration()).rejects.toThrow(
       "The baseline migration cannot be reverted.",

@@ -47,20 +47,22 @@ All routes are prefixed with `/notifications`.
     ```json
     {
       "recipients": {
-        "userIds": ["user-uuid-1"],
-        "roles": ["administrator"]
+        "userIds": ["user-uuid-1", "user-uuid-2"]
       },
       "templateKey": "review_assigned",
       "variables": { "languageName": "French" },
       "metadata": { "tag": "linguistics" },
-      "actorId": "user-uuid-actor"
+      "actorId": "user-uuid-actor",
+      "eventId": "review-1234",
+      "mandatory": false
     }
     ```
 *   **Recipient Targeting Logic:**
-    *   **Specific Users:** Pass an array of user UUIDs in `recipients.userIds`.
-    *   **By Role:** Pass an array of role names in `recipients.roles` (the service will fetch and resolve all user IDs belonging to these roles).
-    *   **Deduplication:** You can mix both `userIds` and `roles`. The service automatically deduplicates recipients to ensure no user receives the same notification twice.
-    *   **Broadcast:** To broadcast to all users, target the general system role that includes all registered users (e.g. `member` or `user`).
+    *   **Specific Users:** Pass an array of user ids in `recipients.userIds` (at most 5,000). The service deduplicates them.
+    *   **By Role:** Not supported here. `recipients.roles` must be empty: the sender resolves roles into user ids first (the admin service does it for its broadcasts).
+*   **Template:** `templateKey` must name a row of `notification_templates`. The migrations add the templates of the platform (`admin_alert`, `review_assigned`, `project_created`, `test_template`) when they are missing. The title and body shown to the user are rendered by the interface (`variamos-components`), from `templateKey` and `variables`.
+*   **Send key (`eventId`, optional):** an id of your choice for this send, at most 128 characters. Send the same key again after a timeout or an error: a recipient who already received it gets nothing more, the others get it. Without a key, a repeated send is saved twice.
+*   **Mandatory (`mandatory`, optional, default `false`):** delivered even to a recipient who muted this template, for security alerts.
 *   **Response:** `201 Created`
 
 ### Get notifications
@@ -137,11 +139,13 @@ export class NotificationClient {
   private readonly token = process.env.NOTIFICATION_INTERNAL_TOKEN;
 
   public async sendNotification(payload: {
-    recipients: { userIds?: string[]; roles?: string[] };
+    recipients: { userIds: string[] };
     templateKey: string;
     variables?: Record<string, any>;
     metadata?: Record<string, any>;
     actorId?: string | null;
+    eventId?: string;
+    mandatory?: boolean;
   }): Promise<void> {
     if (!this.url || !this.token) return;
 

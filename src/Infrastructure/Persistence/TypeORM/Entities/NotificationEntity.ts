@@ -20,6 +20,12 @@ import { JsonValue } from "../../../../Domain/Entities/JsonValue.js";
 @Index("idx_notifications_inbox", ["recipientId", "createdAt"], {
   where: "(deleted_at IS NULL)",
 })
+// One notification per send key and recipient (migration
+// NotificationEventId1794268800000, EV-99)
+@Index("idx_notifications_event_recipient", ["eventId", "recipientId"], {
+  unique: true,
+  where: "(event_id IS NOT NULL)",
+})
 export class NotificationEntity {
   @PrimaryColumn({
     type: "uuid",
@@ -61,4 +67,7 @@ export class NotificationEntity {
     nullable: true,
   })
   deletedAt!: Date | null;
+
+  @Column({ name: "event_id", type: "varchar", length: 128, nullable: true })
+  eventId!: string | null;
 }

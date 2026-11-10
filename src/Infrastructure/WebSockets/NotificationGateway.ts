@@ -50,34 +50,35 @@ async function resolveRoom(
   return userId;
 }
 
-@Injectable()
-@WebSocketGateway({
-  cors: {
-    origin: ALLOWED_ORIGINS,
-  },
-})
-export class RootNotificationGateway
+/**
+ * The connection logic of both namespaces (EV-99, CA-NT-10): a client joins
+ * the room of its user, or is disconnected. Both namespaces stay, `/` and
+ * `/variamos_ms_notifications`: the clients of the platform connect to one
+ * or the other, and removing one would cut them off.
+ */
+abstract class UserRoomGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
-  private readonly logger = new Logger(RootNotificationGateway.name);
+  protected abstract readonly label: string;
+  protected abstract readonly logger: Logger;
 
   @WebSocketServer()
   private readonly server!: Server;
 
-  constructor(
+  protected constructor(
     private readonly verifier: AccessTokenVerifier,
-    @Inject(ACCESS_CONTROL_MODE_TOKEN)
     private readonly mode: AccessControlMode,
   ) {}
 
   public afterInit(_server: Server): void {
-    this.logger.log("RootNotificationGateway (namespace: /) initialized");
+    this.logger.log(
+      `${this.constructor.name} (namespace: ${this.label}) initialized`,
+    );
   }
 
-  public send(notification: Notification, payload: unknown): void {
-    if (this.server) {
-      this.server.to(notification.recipientId).emit("notification", payload);
-    }
+  // To the room of the recipient, on this namespace only
+  public emit(notification: Notification, payload: unknown): void {
+    this.server?.to(notification.recipientId).emit("notification", payload);
   }
 
   public async handleConnection(client: Socket): Promise<void> {
@@ -89,7 +90,7 @@ export class RootNotificationGateway
     );
     if (!userId) {
       this.logger.warn(
-        `Rejected root socket connection without a valid user: ${client.id}`,
+        `Rejected socket connection on ${this.label} without a valid user: ${client.id}`,
       );
       client.disconnect(true);
       return;
@@ -97,7 +98,7 @@ export class RootNotificationGateway
 
     client.join(userId);
     this.logger.log(
-      `[Root /] User connected: userId=${userId}, socketId=${client.id}`,
+      `[${this.label}] User connected: userId=${userId}, socketId=${client.id}`,
     );
   }
 
@@ -105,12 +106,35 @@ export class RootNotificationGateway
     const userId = extractUserId(client);
     if (userId) {
       this.logger.log(
-        `[Root /] User disconnected: userId=${userId}, socketId=${client.id}`,
+        `[${this.label}] User disconnected: userId=${userId}, socketId=${client.id}`,
       );
     }
   }
 }
 
+@Injectable()
+@WebSocketGateway({
+  cors: {
+    origin: ALLOWED_ORIGINS,
+  },
+})
+export class RootNotificationGateway extends UserRoomGateway {
+  protected readonly label = "/";
+  protected readonly logger = new Logger(RootNotificationGateway.name);
+
+  constructor(
+    verifier: AccessTokenVerifier,
+    @Inject(ACCESS_CONTROL_MODE_TOKEN)
+    mode: AccessControlMode,
+  ) {
+    super(verifier, mode);
+  }
+}
+
+/**
+ * The channel of the notifications: each one goes once to each namespace,
+ * so a client connected to one of them receives it once.
+ */
 @Injectable()
 @WebSocketGateway({
   namespace: "variamos_ms_notifications",
@@ -119,28 +143,19 @@ export class RootNotificationGateway
   },
 })
 export class NotificationGateway
-  implements
-    INotificationChannel,
-    OnGatewayInit,
-    OnGatewayConnection,
-    OnGatewayDisconnect
+  extends UserRoomGateway
+  implements INotificationChannel
 {
-  private readonly logger = new Logger(NotificationGateway.name);
-
-  @WebSocketServer()
-  private readonly server!: Server;
+  protected readonly label = "/variamos_ms_notifications";
+  protected readonly logger = new Logger(NotificationGateway.name);
 
   constructor(
     private readonly rootGateway: RootNotificationGateway,
-    private readonly verifier: AccessTokenVerifier,
+    verifier: AccessTokenVerifier,
     @Inject(ACCESS_CONTROL_MODE_TOKEN)
-    private readonly mode: AccessControlMode,
-  ) {}
-
-  public afterInit(_server: Server): void {
-    this.logger.log(
-      "NotificationGateway (namespace: /variamos_ms_notifications) initialized",
-    );
+    mode: AccessControlMode,
+  ) {
+    super(verifier, mode);
   }
 
   public async send(notification: Notification): Promise<void> {
@@ -153,40 +168,7 @@ export class NotificationGateway
       createdAt: notification.createdAt,
     };
 
-    if (this.server) {
-      this.server.to(notification.recipientId).emit("notification", payload);
-    }
-
-    this.rootGateway.send(notification, payload);
-  }
-
-  public async handleConnection(client: Socket): Promise<void> {
-    const userId = await resolveRoom(
-      client,
-      this.verifier,
-      this.mode,
-      this.logger,
-    );
-    if (!userId) {
-      this.logger.warn(
-        `Rejected namespace socket connection without a valid user: ${client.id}`,
-      );
-      client.disconnect(true);
-      return;
-    }
-
-    client.join(userId);
-    this.logger.log(
-      `[Namespace /variamos_ms_notifications] User connected: userId=${userId}, socketId=${client.id}`,
-    );
-  }
-
-  public handleDisconnect(client: Socket): void {
-    const userId = extractUserId(client);
-    if (userId) {
-      this.logger.log(
-        `[Namespace /variamos_ms_notifications] User disconnected: userId=${userId}, socketId=${client.id}`,
-      );
-    }
+    this.emit(notification, payload);
+    this.rootGateway.emit(notification, payload);
   }
 }
