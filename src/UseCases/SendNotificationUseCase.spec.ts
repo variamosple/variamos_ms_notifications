@@ -240,6 +240,70 @@ describe("SendNotificationUseCase", () => {
     expect(notificationChannel.send).not.toHaveBeenCalled();
   });
 
+  describe("key of the send (EV-99, CA-NT-05)", () => {
+    beforeEach(() => {
+      templateRepo.findByKey.mockResolvedValue(
+        new NotificationTemplate(
+          "admin_alert",
+          "{{title}}",
+          "{{body}}",
+          new Date(),
+        ),
+      );
+      preferencesRepo.findByUserIds.mockResolvedValue([]);
+    });
+
+    it("gives each notification the key of the send", async () => {
+      notificationRepo.saveMany.mockImplementation(async (batch) => batch);
+
+      await useCase.execute({
+        recipients: { userIds: ["user-1", "user-2"] },
+        templateKey: "admin_alert",
+        variables: {},
+        metadata: {},
+        eventId: "announcement-42",
+      });
+
+      expect(
+        notificationRepo.saveMany.mock.calls[0][0].map((n) => n.eventId),
+      ).toEqual(["announcement-42", "announcement-42"]);
+    });
+
+    it("leaves the key empty when the sender gives none", async () => {
+      notificationRepo.saveMany.mockImplementation(async (batch) => batch);
+
+      await useCase.execute({
+        recipients: { userIds: ["user-1"] },
+        templateKey: "admin_alert",
+        variables: {},
+        metadata: {},
+      });
+
+      expect(notificationRepo.saveMany.mock.calls[0][0][0].eventId).toBeNull();
+    });
+
+    it("sends again only to the recipients the repository saved", async () => {
+      // user-1 already holds the notification of this key: left out
+      notificationRepo.saveMany.mockImplementation(async (batch) =>
+        batch.filter((n) => n.recipientId !== "user-1"),
+      );
+
+      const result = await useCase.execute({
+        recipients: { userIds: ["user-1", "user-2"] },
+        templateKey: "admin_alert",
+        variables: {},
+        metadata: {},
+        eventId: "announcement-42",
+      });
+
+      expect(result.map((n) => n.recipientId)).toEqual(["user-2"]);
+      expect(notificationChannel.send).toHaveBeenCalledTimes(1);
+      expect(notificationChannel.send.mock.calls[0][0].recipientId).toBe(
+        "user-2",
+      );
+    });
+  });
+
   describe("dispatch by batch (EV-101, OPT-04)", () => {
     const recipients = (count: number) =>
       Array.from({ length: count }, (_, i) => `user-${i}`);

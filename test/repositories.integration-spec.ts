@@ -162,6 +162,33 @@ describe("Repositories (Integration)", () => {
       expect((await notificationRepo.findByRecipient("user-1", 1, 100, "inbox")).length).toBe(51);
     });
 
+    it("saves one notification per send key and recipient, and returns only those saved (EV-99)", async () => {
+      const keyed = (id: string, recipientId: string, eventId: string | null) =>
+        new Notification(id, recipientId, null, "key-1", {}, {}, false, null, new Date("2026-11-10T10:00:00Z"), null, eventId);
+
+      const first = await notificationRepo.saveMany([
+        keyed("44444444-1234-4678-9012-000000000001", "user-1", "event-1"),
+      ]);
+      expect(first.map((n) => n.eventId)).toEqual(["event-1"]);
+
+      // Sent again with its key: user-1 is left out, user-2 is saved
+      const again = await notificationRepo.saveMany([
+        keyed("44444444-1234-4678-9012-000000000002", "user-1", "event-1"),
+        keyed("44444444-1234-4678-9012-000000000003", "user-2", "event-1"),
+      ]);
+      expect(again.map((n) => n.recipientId)).toEqual(["user-2"]);
+      expect(await notificationRepo.findById("44444444-1234-4678-9012-000000000002")).toBeNull();
+
+      // Another key, or no key, is saved again for the same recipient
+      const others = await notificationRepo.saveMany([
+        keyed("44444444-1234-4678-9012-000000000004", "user-1", "event-2"),
+        keyed("44444444-1234-4678-9012-000000000005", "user-1", null),
+        keyed("44444444-1234-4678-9012-000000000006", "user-1", null),
+      ]);
+      expect(others).toHaveLength(3);
+      expect((await notificationRepo.findById("44444444-1234-4678-9012-000000000004"))?.eventId).toBe("event-2");
+    });
+
     it("should support inbox/trash folders and pagination", async () => {
       const notifInbox = new Notification(
         "10000000-1234-5678-9012-36689f94b8cf",

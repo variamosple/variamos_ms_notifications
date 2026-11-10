@@ -228,6 +228,31 @@ describe("AppModule (e2e)", () => {
       expect(response.body).toHaveLength(0);
     });
 
+    it("gives nothing twice when a send is repeated with its key (EV-99, CA-NT-05)", async () => {
+      const send = (userIds: string[]) =>
+        request(app.getHttpServer())
+          .post("/notifications")
+          .set("x-internal-token", internalToken)
+          .send({
+            recipients: { userIds },
+            templateKey: "test_template",
+            variables: { name: "Nathan" },
+            eventId: "announcement-42",
+          })
+          .expect(HttpStatus.CREATED);
+
+      expect((await send(["user-1"])).body).toHaveLength(1);
+      // Repeated after a timeout, with one more recipient
+      const again = await send(["user-1", "user-2"]);
+
+      expect(again.body.map((n: { recipientId: string }) => n.recipientId)).toEqual(["user-2"]);
+      expect(
+        await dataSource.query(
+          `SELECT recipient_id FROM variamos.notifications WHERE event_id = 'announcement-42' ORDER BY 1`,
+        ),
+      ).toEqual([{ recipient_id: "user-1" }, { recipient_id: "user-2" }]);
+    });
+
     it("keeps the health check open", async () => {
       await request(app.getHttpServer()).get("/health").expect(HttpStatus.OK);
     });

@@ -101,3 +101,25 @@ describe("SendNotificationSchema mandatory (EV-99)", () => {
     expect(send({ mandatory: "yes" }).success).toBe(false);
   });
 });
+
+describe("SendNotificationSchema eventId (EV-99, CA-NT-05)", () => {
+  const send = (extra: Record<string, unknown>) =>
+    SendNotificationSchema.safeParse({
+      recipients: { userIds: ["user-1"] },
+      templateKey: "admin_alert",
+      ...extra,
+    });
+
+  it("keeps the key of the send, trimmed, and leaves it out when absent", () => {
+    expect(send({ eventId: " announcement-42 " }).data?.eventId).toBe(
+      "announcement-42",
+    );
+    expect(send({}).data?.eventId).toBeUndefined();
+  });
+
+  it("refuses an empty key, a key over 128 characters and a key that is not a string", () => {
+    expect(send({ eventId: "  " }).success).toBe(false);
+    expect(send({ eventId: "k".repeat(129) }).success).toBe(false);
+    expect(send({ eventId: 42 }).success).toBe(false);
+  });
+});

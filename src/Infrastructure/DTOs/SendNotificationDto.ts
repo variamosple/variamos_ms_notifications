@@ -87,6 +87,9 @@ export const SendNotificationSchema = z.object({
   // Sent whatever the recipients muted; for the security alerts of the
   // admin service (EV-99). Only the internal callers reach this route.
   mandatory: z.boolean().default(false),
+  // Key of the send, the same when it is sent again after a failure or a
+  // timeout: a recipient gets one notification per key (EV-99, CA-NT-05)
+  eventId: Identifier.optional(),
 });
 
 export type SendNotificationDto = z.infer<typeof SendNotificationSchema>;

@@ -83,6 +83,7 @@ export class NotificationController {
       metadata: dto.metadata,
       actorId: dto.actorId,
       mandatory: dto.mandatory,
+      eventId: dto.eventId,
     });
     return sent.map(toNotificationResponse);
   }

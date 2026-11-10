@@ -13,6 +13,9 @@ export class Notification {
     private readTime: Date | null,
     public readonly createdAt: Date,
     private trashTime: Date | null = null,
+    // The key of the send that created it, when its sender gave one: one
+    // notification per key and recipient (EV-99)
+    public readonly eventId: string | null = null,
   ) {}
 
   public get isRead(): boolean {
