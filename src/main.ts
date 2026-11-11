@@ -10,4 +10,9 @@ async function bootstrap(): Promise<void> {
   configureApplication(app);
   await app.listen(process.env.PORT ?? 3000, "0.0.0.0");
 }
-bootstrap();
+
+// A service that cannot start stops, with the reason in its log
+bootstrap().catch((error: unknown) => {
+  console.error("The notification service could not start", error);
+  process.exit(1);
+});

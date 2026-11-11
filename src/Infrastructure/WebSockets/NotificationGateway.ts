@@ -96,7 +96,7 @@ abstract class UserRoomGateway
       return;
     }
 
-    client.join(userId);
+    await client.join(userId);
     this.logger.log(
       `[${this.label}] User connected: userId=${userId}, socketId=${client.id}`,
     );
