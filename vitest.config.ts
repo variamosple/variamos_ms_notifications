@@ -12,6 +12,8 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
+      // lcov for SonarCloud, beside the reports of Vitest by default
+      reporter: ["text", "html", "clover", "json", "lcov"],
       // Start-up, Nest modules, environment and TypeORM persistence are
       // checked by the e2e tests (test:e2e, Docker), not by these
       exclude: [
