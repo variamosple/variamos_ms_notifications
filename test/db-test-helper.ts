@@ -1,4 +1,7 @@
-import { PostgreSqlContainer, StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import {
+  PostgreSqlContainer,
+  StartedPostgreSqlContainer,
+} from "@testcontainers/postgresql";
 import { DataSource } from "typeorm";
 import { NotificationEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/NotificationEntity.js";
 import { NotificationTemplateEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/NotificationTemplateEntity.js";
@@ -42,7 +45,11 @@ export class DbTestHelper {
       password: this.container.getPassword(),
       database: this.container.getDatabase(),
       schema: "variamos",
-      entities: [NotificationEntity, NotificationTemplateEntity, UserPreferencesEntity],
+      entities: [
+        NotificationEntity,
+        NotificationTemplateEntity,
+        UserPreferencesEntity,
+      ],
       // Same path as production: the tables come from the migrations
       migrations: NOTIFICATIONS_MIGRATIONS,
       migrationsTableName: NOTIFICATIONS_MIGRATIONS_TABLE,
@@ -70,7 +77,9 @@ export class DbTestHelper {
     const entities = this.dataSource.entityMetadatas;
     // The migrations table keeps its rows
     for (const entity of entities) {
-      await this.dataSource.query(`TRUNCATE TABLE "variamos"."${entity.tableName}" CASCADE;`);
+      await this.dataSource.query(
+        `TRUNCATE TABLE "variamos"."${entity.tableName}" CASCADE;`,
+      );
     }
   }
 }

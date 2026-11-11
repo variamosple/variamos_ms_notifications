@@ -1,20 +1,25 @@
-import { Test, TestingModule } from "@nestjs/testing";
 import { HttpStatus } from "@nestjs/common";
 import type { NestExpressApplication } from "@nestjs/platform-express";
-import request from "supertest";
-import { io, Socket } from "socket.io-client";
-import { AppModule } from "./../src/app.module.js";
-import { configureApplication } from "../src/Infrastructure/Config/configureApplication.js";
-import { DbTestHelper } from "./db-test-helper.js";
-import { NotificationTemplate } from "../src/Domain/Entities/NotificationTemplate.js";
-import { NotificationTemplateEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/NotificationTemplateEntity.js";
-import { DataSource } from "typeorm";
+import { Test, TestingModule } from "@nestjs/testing";
 import { SignJWT } from "jose";
+import { io, Socket } from "socket.io-client";
+import request from "supertest";
+import { DataSource } from "typeorm";
+import { AppModule } from "./../src/app.module.js";
 import {
   ACCESS_TOKEN_AUDIENCE,
   ACCESS_TOKEN_ISSUER,
   deriveAccessTokenKey,
 } from "../src/Infrastructure/Auth/AccessTokenVerifier.js";
+import { configureApplication } from "../src/Infrastructure/Config/configureApplication.js";
+import { NotificationTemplateEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/NotificationTemplateEntity.js";
+import { DbTestHelper } from "./db-test-helper.js";
+
+/** What the gateway sends to a connected user, as far as these tests read it */
+type SocketNotification = {
+  templateKey: string;
+  variables: Record<string, unknown>;
+};
 
 interface PostgresOptions {
   host?: string;
@@ -50,10 +55,18 @@ describe("AppModule (e2e)", () => {
     await dataSource.query("CREATE SCHEMA IF NOT EXISTS variamos;");
 
     process.env.DATABASE_HOST = (dataSource.options as PostgresOptions).host;
-    process.env.DATABASE_PORT = String((dataSource.options as PostgresOptions).port);
-    process.env.DATABASE_USERNAME = (dataSource.options as PostgresOptions).username;
-    process.env.DATABASE_PASSWORD = (dataSource.options as PostgresOptions).password;
-    process.env.DATABASE_NAME = (dataSource.options as PostgresOptions).database;
+    process.env.DATABASE_PORT = String(
+      (dataSource.options as PostgresOptions).port,
+    );
+    process.env.DATABASE_USERNAME = (
+      dataSource.options as PostgresOptions
+    ).username;
+    process.env.DATABASE_PASSWORD = (
+      dataSource.options as PostgresOptions
+    ).password;
+    process.env.DATABASE_NAME = (
+      dataSource.options as PostgresOptions
+    ).database;
     process.env.NOTIFICATION_INTERNAL_TOKEN = internalToken;
   }, 60000);
 
@@ -245,7 +258,9 @@ describe("AppModule (e2e)", () => {
       // Repeated after a timeout, with one more recipient
       const again = await send(["user-1", "user-2"]);
 
-      expect(again.body.map((n: { recipientId: string }) => n.recipientId)).toEqual(["user-2"]);
+      expect(
+        again.body.map((n: { recipientId: string }) => n.recipientId),
+      ).toEqual(["user-2"]);
       expect(
         await dataSource.query(
           `SELECT recipient_id FROM variamos.notifications WHERE event_id = 'announcement-42' ORDER BY 1`,
@@ -292,11 +307,13 @@ describe("AppModule (e2e)", () => {
       wsClient.connect();
       await connected;
 
-      const notificationReceived = new Promise<any>((resolve) => {
-        wsClient.on("notification", (data) => {
-          resolve(data);
-        });
-      });
+      const notificationReceived = new Promise<SocketNotification>(
+        (resolve) => {
+          wsClient.on("notification", (data) => {
+            resolve(data);
+          });
+        },
+      );
 
       // Post notification to user-ws-1 via HTTP endpoint
       await request(app.getHttpServer())
@@ -332,11 +349,13 @@ describe("AppModule (e2e)", () => {
       wsClient.connect();
       await connected;
 
-      const notificationReceived = new Promise<any>((resolve) => {
-        wsClient.on("notification", (data) => {
-          resolve(data);
-        });
-      });
+      const notificationReceived = new Promise<SocketNotification>(
+        (resolve) => {
+          wsClient.on("notification", (data) => {
+            resolve(data);
+          });
+        },
+      );
 
       await request(app.getHttpServer())
         .post("/notifications")

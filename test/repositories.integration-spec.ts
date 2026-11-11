@@ -1,16 +1,24 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
-import { PostgresQueryRunner } from "typeorm/driver/postgres/PostgresQueryRunner.js";
 import { DataSource } from "typeorm";
-import { DbTestHelper } from "./db-test-helper.js";
-import { NotificationTypeORMRepository } from "../src/Infrastructure/Persistence/TypeORM/Repositories/NotificationTypeORMRepository.js";
-import { NotificationTemplateTypeORMRepository } from "../src/Infrastructure/Persistence/TypeORM/Repositories/NotificationTemplateTypeORMRepository.js";
-import { UserPreferencesTypeORMRepository } from "../src/Infrastructure/Persistence/TypeORM/Repositories/UserPreferencesTypeORMRepository.js";
-import { NotificationEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/NotificationEntity.js";
-import { NotificationTemplateEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/NotificationTemplateEntity.js";
-import { UserPreferencesEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/UserPreferencesEntity.js";
+import { PostgresQueryRunner } from "typeorm/driver/postgres/PostgresQueryRunner.js";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { Notification } from "../src/Domain/Entities/Notification.js";
 import { NotificationTemplate } from "../src/Domain/Entities/NotificationTemplate.js";
 import { UserPreferences } from "../src/Domain/Entities/UserPreferences.js";
+import { NotificationEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/NotificationEntity.js";
+import { NotificationTemplateEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/NotificationTemplateEntity.js";
+import { UserPreferencesEntity } from "../src/Infrastructure/Persistence/TypeORM/Entities/UserPreferencesEntity.js";
+import { NotificationTemplateTypeORMRepository } from "../src/Infrastructure/Persistence/TypeORM/Repositories/NotificationTemplateTypeORMRepository.js";
+import { NotificationTypeORMRepository } from "../src/Infrastructure/Persistence/TypeORM/Repositories/NotificationTypeORMRepository.js";
+import { UserPreferencesTypeORMRepository } from "../src/Infrastructure/Persistence/TypeORM/Repositories/UserPreferencesTypeORMRepository.js";
+import { DbTestHelper } from "./db-test-helper.js";
 
 describe("Repositories (Integration)", () => {
   let dbHelper: DbTestHelper;
@@ -48,11 +56,12 @@ describe("Repositories (Integration)", () => {
       await preferencesRepo.save(prefs);
 
       const found = await preferencesRepo.findByUserId("user-1");
-      expect(found).not.toBeNull();
-      expect(found!.userId).toBe("user-1");
-      expect(found!.emailEnabled).toBe(true);
-      expect(found!.inAppEnabled).toBe(false);
-      expect(found!.mutedEventTypes).toEqual(["event-1"]);
+      expect(found).toMatchObject({
+        userId: "user-1",
+        emailEnabled: true,
+        inAppEnabled: false,
+        mutedEventTypes: ["event-1"],
+      });
     });
 
     it("should return null if user preferences do not exist", async () => {
@@ -61,11 +70,19 @@ describe("Repositories (Integration)", () => {
     });
 
     it("finds the preferences of several users at once, those saved only", async () => {
-      await preferencesRepo.save(new UserPreferences("user-1", true, false, []));
-      await preferencesRepo.save(new UserPreferences("user-2", true, true, ["e"]));
+      await preferencesRepo.save(
+        new UserPreferences("user-1", true, false, []),
+      );
+      await preferencesRepo.save(
+        new UserPreferences("user-2", true, true, ["e"]),
+      );
       await preferencesRepo.save(new UserPreferences("user-3", true, true, []));
 
-      const found = await preferencesRepo.findByUserIds(["user-2", "user-1", "absent"]);
+      const found = await preferencesRepo.findByUserIds([
+        "user-2",
+        "user-1",
+        "absent",
+      ]);
 
       expect(found.map((p) => p.userId).sort()).toEqual(["user-1", "user-2"]);
       expect(await preferencesRepo.findByUserIds([])).toEqual([]);
@@ -74,14 +91,20 @@ describe("Repositories (Integration)", () => {
 
   describe("NotificationTemplateRepository", () => {
     it("should save and find template by key", async () => {
-      const template = new NotificationTemplate("key-1", "Title", "Body", new Date());
+      const template = new NotificationTemplate(
+        "key-1",
+        "Title",
+        "Body",
+        new Date(),
+      );
       await templateRepo.save(template);
 
       const found = await templateRepo.findByKey("key-1");
-      expect(found).not.toBeNull();
-      expect(found!.key).toBe("key-1");
-      expect(found!.titleTemplate).toBe("Title");
-      expect(found!.bodyTemplate).toBe("Body");
+      expect(found).toMatchObject({
+        key: "key-1",
+        titleTemplate: "Title",
+        bodyTemplate: "Body",
+      });
     });
 
     it("should return null if template key does not exist", async () => {
@@ -106,11 +129,14 @@ describe("Repositories (Integration)", () => {
 
       await notificationRepo.save(notif);
 
-      const found = await notificationRepo.findById("42a7b62e-1234-5678-9012-36689f94b8cf");
-      expect(found).not.toBeNull();
-      expect(found!.recipientId).toBe("user-1");
-      expect(found!.variables).toEqual({ name: "Nathan" });
-      expect(found!.metadata).toEqual({ tags: ["test"] });
+      const found = await notificationRepo.findById(
+        "42a7b62e-1234-5678-9012-36689f94b8cf",
+      );
+      expect(found).toMatchObject({
+        recipientId: "user-1",
+        variables: { name: "Nathan" },
+        metadata: { tags: ["test"] },
+      });
 
       const notif2 = new Notification(
         "bebfbd90-1234-5678-9012-36689f94b8cf",
@@ -125,13 +151,25 @@ describe("Repositories (Integration)", () => {
       );
 
       const saved = await notificationRepo.saveMany([notif2]);
-      const found2 = await notificationRepo.findById("bebfbd90-1234-5678-9012-36689f94b8cf");
+      const found2 = await notificationRepo.findById(
+        "bebfbd90-1234-5678-9012-36689f94b8cf",
+      );
       expect(found2).toEqual(saved[0]);
     });
 
     it("saves a batch in one INSERT, all or none (EV-101, OPT-04)", async () => {
       const notifAt = (id: string) =>
-        new Notification(id, "user-1", null, "key-1", { n: [1, { a: null }] }, {}, false, null, new Date("2026-10-25T10:00:00Z"));
+        new Notification(
+          id,
+          "user-1",
+          null,
+          "key-1",
+          { n: [1, { a: null }] },
+          {},
+          false,
+          null,
+          new Date("2026-10-25T10:00:00Z"),
+        );
       const existing = notifAt("11111111-1234-4678-9012-36689f94b8cf");
       await notificationRepo.saveMany([existing]);
 
@@ -142,7 +180,9 @@ describe("Repositories (Integration)", () => {
           existing,
         ]),
       ).rejects.toThrow();
-      expect(await notificationRepo.findById("22222222-1234-4678-9012-36689f94b8cf")).toBeNull();
+      expect(
+        await notificationRepo.findById("22222222-1234-4678-9012-36689f94b8cf"),
+      ).toBeNull();
 
       const query = vi.spyOn(PostgresQueryRunner.prototype, "query");
       let queries: string[];
@@ -159,12 +199,27 @@ describe("Repositories (Integration)", () => {
       expect(queries.filter((q) => !/^(START|COMMIT)/.test(q))).toEqual([
         expect.stringMatching(/^INSERT INTO/),
       ]);
-      expect((await notificationRepo.findByRecipient("user-1", 1, 100, "inbox")).length).toBe(51);
+      expect(
+        (await notificationRepo.findByRecipient("user-1", 1, 100, "inbox"))
+          .length,
+      ).toBe(51);
     });
 
     it("saves one notification per send key and recipient, and returns only those saved (EV-99)", async () => {
       const keyed = (id: string, recipientId: string, eventId: string | null) =>
-        new Notification(id, recipientId, null, "key-1", {}, {}, false, null, new Date("2026-11-10T10:00:00Z"), null, eventId);
+        new Notification(
+          id,
+          recipientId,
+          null,
+          "key-1",
+          {},
+          {},
+          false,
+          null,
+          new Date("2026-11-10T10:00:00Z"),
+          null,
+          eventId,
+        );
 
       const first = await notificationRepo.saveMany([
         keyed("44444444-1234-4678-9012-000000000001", "user-1", "event-1"),
@@ -177,7 +232,9 @@ describe("Repositories (Integration)", () => {
         keyed("44444444-1234-4678-9012-000000000003", "user-2", "event-1"),
       ]);
       expect(again.map((n) => n.recipientId)).toEqual(["user-2"]);
-      expect(await notificationRepo.findById("44444444-1234-4678-9012-000000000002")).toBeNull();
+      expect(
+        await notificationRepo.findById("44444444-1234-4678-9012-000000000002"),
+      ).toBeNull();
 
       // Another key, or no key, is saved again for the same recipient
       const others = await notificationRepo.saveMany([
@@ -186,7 +243,13 @@ describe("Repositories (Integration)", () => {
         keyed("44444444-1234-4678-9012-000000000006", "user-1", null),
       ]);
       expect(others).toHaveLength(3);
-      expect((await notificationRepo.findById("44444444-1234-4678-9012-000000000004"))?.eventId).toBe("event-2");
+      expect(
+        (
+          await notificationRepo.findById(
+            "44444444-1234-4678-9012-000000000004",
+          )
+        )?.eventId,
+      ).toBe("event-2");
     });
 
     it("should support inbox/trash folders and pagination", async () => {
@@ -218,12 +281,22 @@ describe("Repositories (Integration)", () => {
       await notificationRepo.saveMany([notifInbox, notifTrash]);
 
       // Inbox check (deletedAt is null)
-      const inboxList = await notificationRepo.findByRecipient("user-1", 1, 10, "inbox");
+      const inboxList = await notificationRepo.findByRecipient(
+        "user-1",
+        1,
+        10,
+        "inbox",
+      );
       expect(inboxList).toHaveLength(1);
       expect(inboxList[0].id).toBe("10000000-1234-5678-9012-36689f94b8cf");
 
       // Trash check (deletedAt is not null)
-      const trashList = await notificationRepo.findByRecipient("user-1", 1, 10, "trash");
+      const trashList = await notificationRepo.findByRecipient(
+        "user-1",
+        1,
+        10,
+        "trash",
+      );
       expect(trashList).toHaveLength(1);
       expect(trashList[0].id).toBe("20000000-1234-5678-9012-36689f94b8cf");
     });
@@ -280,12 +353,22 @@ describe("Repositories (Integration)", () => {
 
       await notificationRepo.save(notifTrash);
 
-      const trashBefore = await notificationRepo.findByRecipient("user-1", 1, 10, "trash");
+      const trashBefore = await notificationRepo.findByRecipient(
+        "user-1",
+        1,
+        10,
+        "trash",
+      );
       expect(trashBefore).toHaveLength(1);
 
       await notificationRepo.emptyTrash("user-1");
 
-      const trashAfter = await notificationRepo.findByRecipient("user-1", 1, 10, "trash");
+      const trashAfter = await notificationRepo.findByRecipient(
+        "user-1",
+        1,
+        10,
+        "trash",
+      );
       expect(trashAfter).toHaveLength(0);
     });
 
@@ -304,20 +387,35 @@ describe("Repositories (Integration)", () => {
 
       await notificationRepo.save(notif);
 
-      const foundBefore = await notificationRepo.findById("60000000-1234-5678-9012-36689f94b8cf");
-      expect(foundBefore!.deletedAt).toBeNull();
+      const foundBefore = await notificationRepo.findById(
+        "60000000-1234-5678-9012-36689f94b8cf",
+      );
+      if (!foundBefore) throw new Error("The notification was not saved");
+      expect(foundBefore.deletedAt).toBeNull();
 
-      foundBefore!.moveToTrash();
-      await notificationRepo.save(foundBefore!);
+      foundBefore.moveToTrash();
+      await notificationRepo.save(foundBefore);
 
-      const foundAfter = await notificationRepo.findById("60000000-1234-5678-9012-36689f94b8cf");
-      expect(foundAfter!.deletedAt).toBeInstanceOf(Date);
+      const foundAfter = await notificationRepo.findById(
+        "60000000-1234-5678-9012-36689f94b8cf",
+      );
+      expect(foundAfter?.deletedAt).toBeInstanceOf(Date);
     });
   });
 
   describe("NotificationRepository scope (CA-NT-01)", () => {
     const unread = (id: string, recipientId: string) =>
-      new Notification(id, recipientId, null, "key-1", {}, {}, false, null, new Date());
+      new Notification(
+        id,
+        recipientId,
+        null,
+        "key-1",
+        {},
+        {},
+        false,
+        null,
+        new Date(),
+      );
 
     beforeEach(async () => {
       await notificationRepo.saveMany([
@@ -359,18 +457,20 @@ describe("Repositories (Integration)", () => {
     it("pages 25 notifications by 10, newest first", async () => {
       const base = new Date("2026-10-01T00:00:00Z").getTime();
       await notificationRepo.saveMany(
-        Array.from({ length: 25 }, (_, i) =>
-          new Notification(
-            `${String(i).padStart(8, "0")}-1234-4678-9012-36689f94b8cf`,
-            "user-p",
-            null,
-            "key-1",
-            {},
-            {},
-            false,
-            null,
-            new Date(base + i * 60_000),
-          ),
+        Array.from(
+          { length: 25 },
+          (_, i) =>
+            new Notification(
+              `${String(i).padStart(8, "0")}-1234-4678-9012-36689f94b8cf`,
+              "user-p",
+              null,
+              "key-1",
+              {},
+              {},
+              false,
+              null,
+              new Date(base + i * 60_000),
+            ),
         ),
       );
 
