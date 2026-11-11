@@ -34,6 +34,12 @@
       }
     }
   },
+  "overrides": [
+    {
+      "includes": ["**/*.md", "**/*.yml", "**/*.yaml"],
+      "formatter": { "enabled": false }
+    }
+  ],
   "javascript": {
     "parser": {
       "unsafeParameterDecoratorsEnabled": true

@@ -138,8 +138,9 @@ describe("Schema migrations (Integration)", () => {
         'SELECT "key" FROM "fresh"."notification_templates" ORDER BY 1',
       ),
     ).toEqual(
-      PLATFORM_TEMPLATES.map((t) => ({ key: t.key }))
-        .sort((a, b) => a.key.localeCompare(b.key)),
+      PLATFORM_TEMPLATES.map((t) => ({ key: t.key })).sort((a, b) =>
+        a.key.localeCompare(b.key),
+      ),
     );
   });
 
