@@ -4,7 +4,8 @@ FROM node:24-alpine AS build
 WORKDIR /service
 # Dependencies first: a change of the source code reuses this layer
 COPY package.json package-lock.json ./
-RUN npm ci
+# No lifecycle script of the dependencies runs during the build
+RUN npm ci --ignore-scripts
 
 COPY tsconfig.json tsconfig.build.json nest-cli.json ./
 COPY src ./src
