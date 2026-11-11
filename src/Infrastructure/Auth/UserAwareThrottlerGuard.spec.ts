@@ -73,13 +73,23 @@ describe("UserAwareThrottlerGuard", () => {
   });
 
   it("counts each user of a valid token separately", async () => {
-    for (let i = 0; i < 3; i++) await call("/limited", "token-a").expect(200);
-    await call("/limited", "token-a").expect(429);
+    const statusesOfA: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      statusesOfA.push((await call("/limited", "token-a")).status);
+    }
 
-    await call("/limited", "token-b").expect(200);
+    const statusOfB = (await call("/limited", "token-b")).status;
+
+    expect(statusesOfA).toEqual([200, 200, 200, 429]);
+    expect(statusOfB).toBe(200);
   });
 
   it("does not limit a route marked @SkipThrottle()", async () => {
-    for (let i = 0; i < 5; i++) await call("/limited/free").expect(200);
+    const statuses: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      statuses.push((await call("/limited/free")).status);
+    }
+
+    expect(statuses).toEqual([200, 200, 200, 200, 200]);
   });
 });

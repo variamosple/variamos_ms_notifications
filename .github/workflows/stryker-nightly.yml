@@ -30,7 +30,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm ci
+          npm ci --ignore-scripts
 
       # The run fails under the break threshold of stryker.config.json (set just
       # under the measured score). continue-on-error lets the publish step report
@@ -39,7 +39,7 @@ jobs:
         id: stryker
         continue-on-error: true
         run: |
-          npx stryker run --reporters progress,clear-text,html,json
+          npm run stryker -- --reporters progress,clear-text,html,json
 
       - name: Publish score
         if: ${{ always() }}
