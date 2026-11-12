@@ -57,18 +57,6 @@
           }
         }
       }
-    },
-    {
-      "includes": [
-        "src/Infrastructure/Persistence/TypeORM/Repositories/NotificationTypeORMRepository.ts"
-      ],
-      "linter": {
-        "rules": {
-          "nursery": {
-            "noUnsafeTypeAssertion": "info"
-          }
-        }
-      }
     }
   ],
   "javascript": {
