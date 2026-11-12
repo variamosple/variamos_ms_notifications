@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -16,10 +15,7 @@ import {
 } from "@nestjs/common";
 import { SkipThrottle } from "@nestjs/throttler";
 import type { Principal } from "../../Domain/Entities/Principal.js";
-import { DeleteNotificationUseCase } from "../../UseCases/DeleteNotificationUseCase.js";
-import { EmptyTrashUseCase } from "../../UseCases/EmptyTrashUseCase.js";
 import { GetInboxUseCase } from "../../UseCases/GetInboxUseCase.js";
-import { ManagePreferencesUseCase } from "../../UseCases/ManagePreferencesUseCase.js";
 import { MarkAllAsReadUseCase } from "../../UseCases/MarkAllAsReadUseCase.js";
 import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
 import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
@@ -31,31 +27,16 @@ import {
   type RecipientQuery,
   RecipientQuerySchema,
 } from "../DTOs/QueryDtos.js";
-import {
-  toNotificationResponse,
-  toPreferencesResponse,
-} from "../DTOs/Responses.js";
+import { toNotificationResponse } from "../DTOs/Responses.js";
 import type { SendNotificationDto } from "../DTOs/SendNotificationDto.js";
 import { SendNotificationSchema } from "../DTOs/SendNotificationDto.js";
-import type { UpdatePreferencesDto } from "../DTOs/UpdatePreferencesDto.js";
-import { UpdatePreferencesSchema } from "../DTOs/UpdatePreferencesDto.js";
 import { DomainErrorFilter } from "../Filters/DomainErrorFilter.js";
 import { NotificationInternalGuard } from "../Guards/NotificationInternalGuard.js";
 import { ZodQueryPipe } from "../Pipes/ZodQueryPipe.js";
 import { ZodValidationPipe } from "../Pipes/ZodValidationPipe.js";
+import { recipientOf } from "./recipientOf.js";
 
-/**
- * The recipient of a user route is the verified user of the access token.
- * The `recipientId` query parameter is only read for a request without a
- * valid token, in observe mode (ADR-0001), and is ignored otherwise.
- */
-function recipientOf(
-  principal: Principal | undefined,
-  recipientId: string | undefined,
-): string | undefined {
-  return principal ? principal.userId : recipientId;
-}
-
+/** Sending notifications, and the inbox of a user: reading and marking them. */
 @Controller("notifications")
 @UseFilters(DomainErrorFilter)
 export class NotificationController {
@@ -64,9 +45,6 @@ export class NotificationController {
     private readonly getInboxUseCase: GetInboxUseCase,
     private readonly markAsReadUseCase: MarkAsReadUseCase,
     private readonly markAllAsReadUseCase: MarkAllAsReadUseCase,
-    private readonly emptyTrashUseCase: EmptyTrashUseCase,
-    private readonly deleteNotificationUseCase: DeleteNotificationUseCase,
-    private readonly managePreferencesUseCase: ManagePreferencesUseCase,
   ) {}
 
   @Post()
@@ -120,53 +98,6 @@ export class NotificationController {
   ) {
     await this.markAllAsReadUseCase.execute(
       recipientOf(principal, query.recipientId),
-    );
-  }
-
-  @Delete("trash")
-  @HttpCode(HttpStatus.NO_CONTENT)
-  public async emptyTrash(
-    @CurrentPrincipal() principal: Principal | undefined,
-    @Query(new ZodQueryPipe(RecipientQuerySchema)) query: RecipientQuery,
-  ) {
-    await this.emptyTrashUseCase.execute(
-      recipientOf(principal, query.recipientId),
-    );
-  }
-
-  @Delete(":id")
-  @HttpCode(HttpStatus.NO_CONTENT)
-  public async delete(
-    @CurrentPrincipal() principal: Principal | undefined,
-    @Param("id", new ParseUUIDPipe()) id: string,
-  ) {
-    await this.deleteNotificationUseCase.execute(id, principal);
-  }
-
-  @Get("preferences")
-  public async getPreferences(
-    @CurrentPrincipal() principal: Principal | undefined,
-    @Query(new ZodQueryPipe(RecipientQuerySchema)) query: RecipientQuery,
-  ) {
-    return toPreferencesResponse(
-      await this.managePreferencesUseCase.get(
-        recipientOf(principal, query.recipientId),
-      ),
-    );
-  }
-
-  @Patch("preferences")
-  public async updatePreferences(
-    @CurrentPrincipal() principal: Principal | undefined,
-    @Query(new ZodQueryPipe(RecipientQuerySchema)) query: RecipientQuery,
-    @Body(new ZodValidationPipe(UpdatePreferencesSchema))
-    dto: UpdatePreferencesDto,
-  ) {
-    return toPreferencesResponse(
-      await this.managePreferencesUseCase.update(
-        recipientOf(principal, query.recipientId),
-        dto,
-      ),
     );
   }
 }

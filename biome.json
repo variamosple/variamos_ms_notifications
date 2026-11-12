@@ -37,26 +37,6 @@
           }
         }
       }
-    },
-    {
-      "includes": [
-        "src/Domain/Entities/Notification.ts",
-        "src/Infrastructure/Controllers/NotificationController.ts",
-        "src/Infrastructure/Modules/notification.module.ts",
-        "src/UseCases/SendNotificationUseCase.ts"
-      ],
-      "linter": {
-        "rules": {
-          "complexity": {
-            "useMaxParams": {
-              "level": "info",
-              "options": {
-                "max": 4
-              }
-            }
-          }
-        }
-      }
     }
   ],
   "javascript": {

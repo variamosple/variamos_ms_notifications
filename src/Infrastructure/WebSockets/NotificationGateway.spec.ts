@@ -51,17 +51,17 @@ const setServer = (gateway: object, server: Server) => {
 };
 
 const notification = () =>
-  new Notification(
-    "n-1",
-    "user-1",
-    "actor-1",
-    "welcome",
-    { name: "Ana" },
-    { source: "admin" },
-    false,
-    null,
-    new Date("2026-10-16T10:00:00Z"),
-  );
+  new Notification({
+    id: "n-1",
+    recipientId: "user-1",
+    actorId: "actor-1",
+    templateKey: "welcome",
+    variables: { name: "Ana" },
+    metadata: { source: "admin" },
+    read: false,
+    readTime: null,
+    createdAt: new Date("2026-10-16T10:00:00Z"),
+  });
 
 describe.each([
   ["RootNotificationGateway", rootGateway],

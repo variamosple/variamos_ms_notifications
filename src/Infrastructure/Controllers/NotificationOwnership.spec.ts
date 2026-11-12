@@ -25,7 +25,7 @@ import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.
 import { ACCESS_CONTROL_MODE_TOKEN } from "../Auth/AccessControlMode.js";
 import { AccessTokenVerifier } from "../Auth/AccessTokenVerifier.js";
 import { UserAccessGuard } from "../Auth/UserAccessGuard.js";
-import { NotificationController } from "./NotificationController.js";
+import { NOTIFICATION_CONTROLLERS } from "./notificationControllers.js";
 
 /**
  * Ownership (EV-68 lot 2, CA-NT-01, CA-NT-03): with a valid access token,
@@ -85,17 +85,17 @@ const B1 = "bbbbbbbb-1111-4111-8111-111111111111";
 const MISSING = "cccccccc-1111-4111-8111-111111111111";
 
 const notificationOf = (id: string, recipientId: string) =>
-  new Notification(
+  new Notification({
     id,
     recipientId,
-    null,
-    "welcome",
-    {},
-    {},
-    false,
-    null,
-    new Date(),
-  );
+    actorId: null,
+    templateKey: "welcome",
+    variables: {},
+    metadata: {},
+    read: false,
+    readTime: null,
+    createdAt: new Date(),
+  });
 
 // "token-a" is user-a's valid access token
 const verifier = {
@@ -115,7 +115,7 @@ describe("Notification ownership with an access token", () => {
   beforeAll(async () => {
     vi.spyOn(Logger.prototype, "warn").mockImplementation(() => {});
     const moduleRef = await Test.createTestingModule({
-      controllers: [NotificationController],
+      controllers: NOTIFICATION_CONTROLLERS,
       providers: [
         { provide: SendNotificationUseCase, useValue: { execute: vi.fn() } },
         {

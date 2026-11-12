@@ -28,13 +28,13 @@ describe("SendNotificationUseCase", () => {
     userService = mock<IUserService>();
     notificationChannel = mock<INotificationChannel>();
 
-    useCase = new SendNotificationUseCase(
+    useCase = new SendNotificationUseCase({
       notificationRepo,
       preferencesRepo,
       templateRepo,
       userService,
       notificationChannel,
-    );
+    });
   });
 
   it("should throw an error if the template key is not found", async () => {

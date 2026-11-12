@@ -6,3 +6,5 @@ export const NOTIFICATION_TEMPLATE_REPOSITORY =
   "INotificationTemplateRepository";
 export const USER_SERVICE = "IUserService";
 export const NOTIFICATION_CHANNEL = "INotificationChannel";
+// The three stores of a send, grouped for SendNotificationUseCase
+export const SEND_NOTIFICATION_STORES = "SendNotificationStores";

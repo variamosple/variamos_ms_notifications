@@ -3,17 +3,17 @@ import { Notification } from "./Notification.js";
 
 describe("Notification", () => {
   it("should initialize unread and not deleted", () => {
-    const notif = new Notification(
-      "id-1",
-      "user-1",
-      null,
-      "test_key",
-      {},
-      {},
-      false,
-      null,
-      new Date(),
-    );
+    const notif = new Notification({
+      id: "id-1",
+      recipientId: "user-1",
+      actorId: null,
+      templateKey: "test_key",
+      variables: {},
+      metadata: {},
+      read: false,
+      readTime: null,
+      createdAt: new Date(),
+    });
 
     expect(notif.isRead).toBe(false);
     expect(notif.readAt).toBeNull();
@@ -21,17 +21,17 @@ describe("Notification", () => {
   });
 
   it("should mark as read and record current timestamp", () => {
-    const notif = new Notification(
-      "id-1",
-      "user-1",
-      null,
-      "test_key",
-      {},
-      {},
-      false,
-      null,
-      new Date(),
-    );
+    const notif = new Notification({
+      id: "id-1",
+      recipientId: "user-1",
+      actorId: null,
+      templateKey: "test_key",
+      variables: {},
+      metadata: {},
+      read: false,
+      readTime: null,
+      createdAt: new Date(),
+    });
 
     notif.markAsRead();
     expect(notif.isRead).toBe(true);
@@ -42,17 +42,17 @@ describe("Notification", () => {
   });
 
   it("should manage trash lifecycle correctly", () => {
-    const notif = new Notification(
-      "id-1",
-      "user-1",
-      null,
-      "test_key",
-      {},
-      {},
-      false,
-      null,
-      new Date(),
-    );
+    const notif = new Notification({
+      id: "id-1",
+      recipientId: "user-1",
+      actorId: null,
+      templateKey: "test_key",
+      variables: {},
+      metadata: {},
+      read: false,
+      readTime: null,
+      createdAt: new Date(),
+    });
 
     notif.moveToTrash();
     expect(notif.deletedAt).toBeInstanceOf(Date);
