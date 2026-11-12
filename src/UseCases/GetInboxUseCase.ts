@@ -3,7 +3,8 @@ import { requireRecipient } from "../Domain/Errors/NotificationErrors.js";
 import { INotificationRepository } from "../Domain/Repositories/INotificationRepository.js";
 
 export interface GetInboxInput {
-  recipientId: string;
+  // Refused when missing, as an absent query parameter gives undefined
+  recipientId: string | undefined;
   page: number;
   limit: number;
   folder: "inbox" | "trash";
