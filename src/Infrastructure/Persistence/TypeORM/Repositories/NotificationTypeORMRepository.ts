@@ -94,7 +94,7 @@ export class NotificationTypeORMRepository implements INotificationRepository {
 
   public async countUnread(recipientId: string): Promise<number> {
     requireRecipient(recipientId);
-    return this.repository.count({
+    return await this.repository.count({
       where: {
         recipientId,
         isRead: false,

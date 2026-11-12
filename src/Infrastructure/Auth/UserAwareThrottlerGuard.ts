@@ -10,11 +10,13 @@ export const RATE_LIMIT = { ttl: 60_000, limit: 120 };
  */
 @Injectable()
 export class UserAwareThrottlerGuard extends ThrottlerGuard {
-  protected override async getTracker(
+  protected override getTracker(
     request: RequestWithPrincipal & { ip?: string },
   ): Promise<string> {
-    return request.principal
-      ? `user:${request.principal.userId}`
-      : `ip:${request.ip ?? "unknown"}`;
+    return Promise.resolve(
+      request.principal
+        ? `user:${request.principal.userId}`
+        : `ip:${request.ip ?? "unknown"}`,
+    );
   }
 }

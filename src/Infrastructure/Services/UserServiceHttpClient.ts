@@ -9,9 +9,11 @@ import { IUserService } from "../../Domain/Services/IUserService.js";
  */
 @Injectable()
 export class UserServiceHttpClient implements IUserService {
-  public async findUserIdsByRoles(_roles: string[]): Promise<string[]> {
-    throw new Error(
-      "Role resolution is not available: send user ids resolved by the admin service.",
+  public findUserIdsByRoles(_roles: string[]): Promise<string[]> {
+    return Promise.reject(
+      new Error(
+        "Role resolution is not available: send user ids resolved by the admin service.",
+      ),
     );
   }
 }
