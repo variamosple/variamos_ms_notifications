@@ -112,8 +112,8 @@ describe("HealthController", () => {
 
       await controller.getHealth({ status } as unknown as Response);
 
-      expect([200, 503]).toContain(status.mock.calls[0][0]);
-      const body = json.mock.calls[0][0] as HealthJsonResult;
+      expect([200, 503]).toContain(status.mock.calls[0]?.[0]);
+      const body = json.mock.calls[0]?.[0] as HealthJsonResult;
       expect(body).toMatchObject({
         serviceName: "variamos_ms_notifications",
         status: expect.stringMatching(/^(UP|DEGRADED|DOWN)$/),

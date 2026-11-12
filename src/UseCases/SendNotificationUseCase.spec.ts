@@ -74,10 +74,10 @@ describe("SendNotificationUseCase", () => {
     });
 
     expect(result).toHaveLength(2);
-    expect(result[0].recipientId).toBe("user-1");
-    expect(result[1].recipientId).toBe("user-2");
-    expect(result[0].variables).toEqual({ name: "Tester" });
-    expect(result[0].isRead).toBe(false);
+    expect(result[0]?.recipientId).toBe("user-1");
+    expect(result[1]?.recipientId).toBe("user-2");
+    expect(result[0]?.variables).toEqual({ name: "Tester" });
+    expect(result[0]?.isRead).toBe(false);
     expect(notificationRepo.saveMany).toHaveBeenCalledTimes(1);
     expect(notificationChannel.send).toHaveBeenCalledTimes(2);
   });
@@ -107,8 +107,8 @@ describe("SendNotificationUseCase", () => {
       "administrator",
     ]);
     expect(result).toHaveLength(2);
-    expect(result[0].recipientId).toBe("admin-1");
-    expect(result[1].recipientId).toBe("admin-2");
+    expect(result[0]?.recipientId).toBe("admin-1");
+    expect(result[1]?.recipientId).toBe("admin-2");
   });
 
   it("should not query user service if roles list is empty", async () => {
@@ -156,8 +156,8 @@ describe("SendNotificationUseCase", () => {
     });
 
     expect(result).toHaveLength(1);
-    expect(result[0].recipientId).toBe("user-2");
-    expect(notificationRepo.saveMany.mock.calls[0][0]).toHaveLength(1);
+    expect(result[0]?.recipientId).toBe("user-2");
+    expect(notificationRepo.saveMany.mock.calls[0]?.[0]).toHaveLength(1);
     expect(notificationChannel.send).toHaveBeenCalledTimes(1);
   });
 
@@ -207,8 +207,8 @@ describe("SendNotificationUseCase", () => {
     });
 
     expect(result).toHaveLength(1);
-    expect(result[0].recipientId).toBe("user-new");
-    expect(result[0].isRead).toBe(false);
+    expect(result[0]?.recipientId).toBe("user-new");
+    expect(result[0]?.isRead).toBe(false);
     // Verify that it still gets sent via websocket channel (default inAppEnabled is true)
     expect(notificationChannel.send).toHaveBeenCalledTimes(1);
   });
@@ -235,8 +235,8 @@ describe("SendNotificationUseCase", () => {
     });
 
     expect(result).toHaveLength(1);
-    expect(result[0].recipientId).toBe("user-1");
-    expect(notificationRepo.saveMany.mock.calls[0][0]).toHaveLength(1);
+    expect(result[0]?.recipientId).toBe("user-1");
+    expect(notificationRepo.saveMany.mock.calls[0]?.[0]).toHaveLength(1);
     expect(notificationChannel.send).not.toHaveBeenCalled();
   });
 
@@ -265,7 +265,7 @@ describe("SendNotificationUseCase", () => {
       });
 
       expect(
-        notificationRepo.saveMany.mock.calls[0][0].map((n) => n.eventId),
+        notificationRepo.saveMany.mock.calls[0]?.[0]?.map((n) => n.eventId),
       ).toEqual(["announcement-42", "announcement-42"]);
     });
 
@@ -279,7 +279,9 @@ describe("SendNotificationUseCase", () => {
         metadata: {},
       });
 
-      expect(notificationRepo.saveMany.mock.calls[0][0][0].eventId).toBeNull();
+      expect(
+        notificationRepo.saveMany.mock.calls[0]?.[0]?.[0]?.eventId,
+      ).toBeNull();
     });
 
     it("sends again only to the recipients the repository saved", async () => {
@@ -298,7 +300,7 @@ describe("SendNotificationUseCase", () => {
 
       expect(result.map((n) => n.recipientId)).toEqual(["user-2"]);
       expect(notificationChannel.send).toHaveBeenCalledTimes(1);
-      expect(notificationChannel.send.mock.calls[0][0].recipientId).toBe(
+      expect(notificationChannel.send.mock.calls[0]?.[0]?.recipientId).toBe(
         "user-2",
       );
     });
