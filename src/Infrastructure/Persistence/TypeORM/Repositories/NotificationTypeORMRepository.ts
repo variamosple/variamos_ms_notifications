@@ -7,6 +7,15 @@ import { INotificationRepository } from "../../../../Domain/Repositories/INotifi
 import { NotificationEntity } from "../Entities/NotificationEntity.js";
 import * as NotificationMapper from "../Mappers/NotificationMapper.js";
 
+/** The id of a row returned by an INSERT, as a list of zero or one. */
+const idOf = (row: unknown): string[] => {
+  const id: unknown =
+    typeof row === "object" && row !== null
+      ? Reflect.get(row, "id")
+      : undefined;
+  return typeof id === "string" ? [id] : [];
+};
+
 @Injectable()
 export class NotificationTypeORMRepository implements INotificationRepository {
   constructor(
@@ -47,18 +56,19 @@ export class NotificationTypeORMRepository implements INotificationRepository {
     // ignore is the one on the key. updateEntity(false): TypeORM would copy
     // the rows returned into the entities by position, which no longer
     // match once a row is left out.
+    const rows: ObjectLiteral[] = entities;
     const inserted = await this.repository.manager
       .createQueryBuilder()
       .insert()
       .into(NotificationEntity)
-      .values(entities as ObjectLiteral[])
+      .values(rows)
       .orIgnore()
       .returning(["id"])
       .updateEntity(false)
       .execute();
-    const insertedIds = new Set(
-      (inserted.raw as { id: string }[]).map((row) => row.id),
-    );
+    // The driver gives the returned rows untyped: only text ids are kept
+    const returned: unknown[] = Array.isArray(inserted.raw) ? inserted.raw : [];
+    const insertedIds = new Set(returned.flatMap(idOf));
     return entities
       .filter((e) => insertedIds.has(e.id))
       .map((e) => NotificationMapper.toDomain(e));
