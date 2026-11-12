@@ -50,14 +50,16 @@ class InMemoryNotifications implements INotificationRepository {
     return [...this.rows.values()].filter((n) => n.recipientId === recipientId);
   }
   public async countUnread(recipientId: string) {
-    return (await this.findByRecipient(recipientId)).filter((n) => !n.isRead)
-      .length;
+    const notifications = await this.findByRecipient(recipientId);
+    return notifications.filter((n) => !n.isRead).length;
   }
   public async markAllAsRead(recipientId: string) {
-    for (const n of await this.findByRecipient(recipientId)) n.markAsRead();
+    const notifications = await this.findByRecipient(recipientId);
+    for (const n of notifications) n.markAsRead();
   }
   public async emptyTrash(recipientId: string) {
-    for (const n of await this.findByRecipient(recipientId)) {
+    const notifications = await this.findByRecipient(recipientId);
+    for (const n of notifications) {
       if (n.deletedAt) this.rows.delete(n.id);
     }
   }
@@ -149,11 +151,6 @@ describe("Notification ownership with an access token", () => {
     await app.init();
   });
 
-  afterAll(async () => {
-    await app.close();
-    vi.restoreAllMocks();
-  });
-
   beforeEach(async () => {
     notifications.rows.clear();
     preferences.rows.clear();
@@ -161,6 +158,11 @@ describe("Notification ownership with an access token", () => {
       notificationOf(A1, "user-a"),
       notificationOf(B1, "user-b"),
     ]);
+  });
+
+  afterAll(async () => {
+    await app.close();
+    vi.restoreAllMocks();
   });
 
   it("lists only the token user's notifications, whatever recipientId says", async () => {
@@ -237,18 +239,21 @@ describe("Notification ownership with an access token", () => {
       ["PATCH", "/notifications/read-all"],
       ["DELETE", "/notifications/trash"],
       ["GET", "/notifications/preferences"],
-    ])("answers 400 for %s %s without any recipient", async (method, url) => {
-      const pending =
-        method === "GET"
-          ? http().get(url)
-          : method === "PATCH"
-            ? http().patch(url)
-            : http().delete(url);
+    ] as const)(
+      "answers 400 for %s %s without any recipient",
+      async (method, url) => {
+        const send = {
+          GET: () => http().get(url),
+          PATCH: () => http().patch(url),
+          DELETE: () => http().delete(url),
+        }[method];
+        const pending = send();
 
-      const response = await pending.expect(HttpStatus.BAD_REQUEST);
-      expect(response.body.errorCode).toBe("MISSING_RECIPIENT");
-      expect(notifications.rows.get(A1)?.isRead).toBe(false);
-      expect(notifications.rows.get(B1)?.isRead).toBe(false);
-    });
+        const response = await pending.expect(HttpStatus.BAD_REQUEST);
+        expect(response.body.errorCode).toBe("MISSING_RECIPIENT");
+        expect(notifications.rows.get(A1)?.isRead).toBe(false);
+        expect(notifications.rows.get(B1)?.isRead).toBe(false);
+      },
+    );
   });
 });

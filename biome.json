@@ -1,5 +1,6 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+  "extends": ["./biome.shared.jsonc"],
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -18,26 +19,44 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "recommended",
       "style": {
         "useImportType": "off"
       },
-      "suspicious": {
-        "noExplicitAny": "error",
-        "noSkippedTests": "error"
-      },
-      "complexity": {
-        "noExcessiveNestedTestSuites": "error"
-      },
       "correctness": {
-        "noUnusedVariables": "warn"
+        "useHookAtTopLevel": "off"
       }
     }
   },
   "overrides": [
     {
-      "includes": ["**/*.md", "**/*.yml", "**/*.yaml"],
-      "formatter": { "enabled": false }
+      "includes": ["src/main.ts", "src/Infrastructure/Config/env.config.ts"],
+      "linter": {
+        "rules": {
+          "nursery": {
+            "noProcessExit": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/Domain/Entities/Notification.ts",
+        "src/Infrastructure/Controllers/NotificationController.ts",
+        "src/Infrastructure/Modules/notification.module.ts",
+        "src/UseCases/SendNotificationUseCase.ts"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "useMaxParams": {
+              "level": "info",
+              "options": {
+                "max": 4
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "javascript": {

@@ -70,7 +70,8 @@ export class SendNotificationUseCase {
     // saved preferences gets the defaults
     const preferencesByUser = new Map<string, UserPreferences>();
     for (const ids of chunks(recipientIds, DISPATCH_BATCH_SIZE)) {
-      for (const preferences of await this.preferencesRepo.findByUserIds(ids)) {
+      const saved = await this.preferencesRepo.findByUserIds(ids);
+      for (const preferences of saved) {
         preferencesByUser.set(preferences.userId, preferences);
       }
     }

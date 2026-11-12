@@ -44,7 +44,8 @@ describe("validateEnv", () => {
     expect(validateEnv().DATABASE_SSL).toBe(expected);
   });
 
-  const expectStop = (variable: string) => {
+  // Runs validateEnv, checks it stopped the service, returns what it logged
+  const stopMessage = (): string => {
     const exit = vi.spyOn(process, "exit").mockImplementation(() => {
       throw new Error("exit");
     });
@@ -54,14 +55,15 @@ describe("validateEnv", () => {
     expect(exit).toHaveBeenCalledWith(1);
     expect(error).toHaveBeenCalledWith(
       "Invalid environment variables:",
-      expect.stringContaining(variable),
+      expect.any(String),
     );
+    return String(error.mock.calls[0]?.[1]);
   };
 
   it("stops the service on an invalid variable", () => {
     stubEnv({ ...SERVER_ENV, DATABASE_PORT: "not-a-port" });
 
-    expectStop("DATABASE_PORT");
+    expect(stopMessage()).toContain("DATABASE_PORT");
   });
 
   it.each(REQUIRED_IN_PRODUCTION)(
@@ -69,7 +71,7 @@ describe("validateEnv", () => {
     (name) => {
       stubEnv({ ...SERVER_ENV, [name]: " " });
 
-      expectStop(`${name} is required in production`);
+      expect(stopMessage()).toContain(`${name} is required in production`);
     },
   );
 

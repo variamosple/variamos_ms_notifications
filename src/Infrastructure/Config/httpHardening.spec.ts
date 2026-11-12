@@ -42,18 +42,18 @@ describe("applyHttpHardening", () => {
   });
 
   it("answers 413 for a JSON body above 100 kB", async () => {
-    await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .post("/probe/echo")
       .set("Content-Type", "application/json")
-      .send(JSON.stringify({ text: "x".repeat(101 * 1024) }))
-      .expect(413);
+      .send(JSON.stringify({ text: "x".repeat(101 * 1024) }));
+    expect(response.status).toBe(413);
   });
 
   it("accepts a JSON body below the limit", async () => {
-    await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .post("/probe/echo")
-      .send({ text: "x".repeat(50 * 1024) })
-      .expect(201);
+      .send({ text: "x".repeat(50 * 1024) });
+    expect(response.status).toBe(201);
   });
 
   it("reads the client address forwarded by a proxy on a private address", async () => {

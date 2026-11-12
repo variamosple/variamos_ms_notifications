@@ -110,30 +110,30 @@ describe("UserAccessGuard", () => {
     it("refuses a forged token", async () => {
       app = await createApp("enforce");
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .get("/notifications")
-        .set("Authorization", "Bearer forged-token")
-        .expect(HttpStatus.UNAUTHORIZED);
+        .set("Authorization", "Bearer forged-token");
+      expect(response.status).toBe(HttpStatus.UNAUTHORIZED);
     });
 
     it("accepts a valid token", async () => {
       app = await createApp("enforce");
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .get("/notifications?recipientId=user-42")
-        .set("Authorization", "Bearer valid-token")
-        .expect(HttpStatus.OK);
+        .set("Authorization", "Bearer valid-token");
+      expect(response.status).toBe(HttpStatus.OK);
     });
 
     it("keeps the internal route on the internal token only", async () => {
       vi.stubEnv("NOTIFICATION_INTERNAL_TOKEN", "internal");
       app = await createApp("enforce");
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post("/notifications")
         .set("x-internal-token", "internal")
-        .send({ recipients: { userIds: ["u"] }, templateKey: "welcome" })
-        .expect(HttpStatus.CREATED);
+        .send({ recipients: { userIds: ["u"] }, templateKey: "welcome" });
+      expect(response.status).toBe(HttpStatus.CREATED);
     });
   });
 });

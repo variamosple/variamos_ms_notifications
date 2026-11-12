@@ -117,14 +117,14 @@ describe("AppModule (e2e)", () => {
 
   describe("HTTP API", () => {
     it("POST /notifications should fail if token is missing or invalid", async () => {
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post("/notifications")
         .send({
           recipients: { userIds: ["user-1"] },
           templateKey: "test_template",
           variables: { name: "Nathan" },
-        })
-        .expect(HttpStatus.UNAUTHORIZED);
+        });
+      expect(response.status).toBe(HttpStatus.UNAUTHORIZED);
     });
 
     it("POST /notifications should validate input using Zod and return 201 on success", async () => {
@@ -202,9 +202,10 @@ describe("AppModule (e2e)", () => {
 
   describe("Access control (enforce mode)", () => {
     it("refuses a user route without access token", async () => {
-      await request(app.getHttpServer())
-        .get("/notifications?recipientId=user-1")
-        .expect(HttpStatus.UNAUTHORIZED);
+      const response = await request(app.getHttpServer()).get(
+        "/notifications?recipientId=user-1",
+      );
+      expect(response.status).toBe(HttpStatus.UNAUTHORIZED);
     });
 
     it("refuses a forged access token", async () => {
@@ -216,10 +217,10 @@ describe("AppModule (e2e)", () => {
         .setExpirationTime("15m")
         .sign(deriveAccessTokenKey("another-secret"));
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .get("/notifications")
-        .set("Authorization", `Bearer ${forged}`)
-        .expect(HttpStatus.UNAUTHORIZED);
+        .set("Authorization", `Bearer ${forged}`);
+      expect(response.status).toBe(HttpStatus.UNAUTHORIZED);
     });
 
     it("never lists another user's notifications, whatever recipientId says", async () => {
@@ -269,7 +270,8 @@ describe("AppModule (e2e)", () => {
     });
 
     it("keeps the health check open", async () => {
-      await request(app.getHttpServer()).get("/health").expect(HttpStatus.OK);
+      const response = await request(app.getHttpServer()).get("/health");
+      expect(response.status).toBe(HttpStatus.OK);
     });
 
     it("disconnects a socket without access token, even with a userId", async () => {

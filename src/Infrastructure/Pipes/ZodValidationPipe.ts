@@ -31,12 +31,12 @@ export class ZodValidationPipe implements PipeTransform {
       return this.schema.parse(parsedValue);
     } catch (error) {
       if (error instanceof ZodError) {
-        throw new BadRequestException({
-          message: "Validation failed",
-          errors: validationIssues(error),
-        });
+        throw new BadRequestException(
+          { message: "Validation failed", errors: validationIssues(error) },
+          { cause: error },
+        );
       }
-      throw new BadRequestException("Validation failed");
+      throw new BadRequestException("Validation failed", { cause: error });
     }
   }
 }

@@ -91,13 +91,13 @@ describe("NotificationController HTTP contract", () => {
     await app.init();
   });
 
-  afterAll(async () => {
-    await app.close();
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("NOTIFICATION_INTERNAL_TOKEN", INTERNAL_TOKEN);
+  });
+
+  afterAll(async () => {
+    await app.close();
   });
 
   describe("POST /notifications (internal)", () => {
@@ -178,7 +178,10 @@ describe("NotificationController HTTP contract", () => {
       expect(response.body.message).toBe("Validation failed");
       expect(response.body.errors.length).toBeGreaterThan(0);
       for (const issue of response.body.errors) {
-        expect(Object.keys(issue).sort()).toEqual(["message", "path"]);
+        expect(Object.keys(issue).sort((a, b) => a.localeCompare(b))).toEqual([
+          "message",
+          "path",
+        ]);
       }
     });
 

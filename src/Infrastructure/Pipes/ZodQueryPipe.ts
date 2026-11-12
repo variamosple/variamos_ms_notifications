@@ -13,10 +13,14 @@ export class ZodQueryPipe implements PipeTransform {
     try {
       return this.schema.parse(value ?? {});
     } catch (error) {
-      throw new BadRequestException({
-        message: "Invalid query parameters",
-        errors: error instanceof ZodError ? validationIssues(error) : undefined,
-      });
+      throw new BadRequestException(
+        {
+          message: "Invalid query parameters",
+          errors:
+            error instanceof ZodError ? validationIssues(error) : undefined,
+        },
+        { cause: error },
+      );
     }
   }
 }
