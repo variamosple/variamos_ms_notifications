@@ -31,8 +31,10 @@ export class Baseline1792281600000 implements MigrationInterface {
     );
   }
 
-  public async down(): Promise<void> {
+  public down(): Promise<void> {
     // Reverting would drop the tables and every notification they hold
-    throw new Error("The baseline migration cannot be reverted.");
+    return Promise.reject(
+      new Error("The baseline migration cannot be reverted."),
+    );
   }
 }

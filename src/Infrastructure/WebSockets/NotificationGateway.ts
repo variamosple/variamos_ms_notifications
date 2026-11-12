@@ -158,7 +158,7 @@ export class NotificationGateway
     super(verifier, mode);
   }
 
-  public async send(notification: Notification): Promise<void> {
+  public send(notification: Notification): Promise<void> {
     const payload = {
       id: notification.id,
       templateKey: notification.templateKey,
@@ -170,5 +170,6 @@ export class NotificationGateway
 
     this.emit(notification, payload);
     this.rootGateway.emit(notification, payload);
+    return Promise.resolve();
   }
 }

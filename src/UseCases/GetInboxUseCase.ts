@@ -13,7 +13,7 @@ export class GetInboxUseCase {
   constructor(private readonly notificationRepo: INotificationRepository) {}
 
   public async execute(input: GetInboxInput): Promise<Notification[]> {
-    return this.notificationRepo.findByRecipient(
+    return await this.notificationRepo.findByRecipient(
       requireRecipient(input.recipientId),
       input.page,
       input.limit,
