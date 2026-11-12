@@ -94,7 +94,7 @@ export class NotificationController {
     @Query(new ZodQueryPipe(InboxQuerySchema)) query: InboxQuery,
   ) {
     const notifications = await this.getInboxUseCase.execute({
-      recipientId: recipientOf(principal, query.recipientId) as string,
+      recipientId: recipientOf(principal, query.recipientId),
       page: query.page,
       limit: query.limit,
       folder: query.folder,
@@ -119,7 +119,7 @@ export class NotificationController {
     @Query(new ZodQueryPipe(RecipientQuerySchema)) query: RecipientQuery,
   ) {
     await this.markAllAsReadUseCase.execute(
-      recipientOf(principal, query.recipientId) as string,
+      recipientOf(principal, query.recipientId),
     );
   }
 
@@ -130,7 +130,7 @@ export class NotificationController {
     @Query(new ZodQueryPipe(RecipientQuerySchema)) query: RecipientQuery,
   ) {
     await this.emptyTrashUseCase.execute(
-      recipientOf(principal, query.recipientId) as string,
+      recipientOf(principal, query.recipientId),
     );
   }
 
@@ -150,7 +150,7 @@ export class NotificationController {
   ) {
     return toPreferencesResponse(
       await this.managePreferencesUseCase.get(
-        recipientOf(principal, query.recipientId) as string,
+        recipientOf(principal, query.recipientId),
       ),
     );
   }
@@ -164,7 +164,7 @@ export class NotificationController {
   ) {
     return toPreferencesResponse(
       await this.managePreferencesUseCase.update(
-        recipientOf(principal, query.recipientId) as string,
+        recipientOf(principal, query.recipientId),
         dto,
       ),
     );

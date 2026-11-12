@@ -4,7 +4,7 @@ import { INotificationRepository } from "../Domain/Repositories/INotificationRep
 export class EmptyTrashUseCase {
   constructor(private readonly notificationRepo: INotificationRepository) {}
 
-  public async execute(recipientId: string): Promise<void> {
+  public async execute(recipientId: string | undefined): Promise<void> {
     await this.notificationRepo.emptyTrash(requireRecipient(recipientId));
   }
 }

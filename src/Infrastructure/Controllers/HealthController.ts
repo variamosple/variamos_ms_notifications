@@ -32,7 +32,9 @@ export class HealthController {
       dbStatus = "DOWN";
       // The detail of the driver (host, port, user) stays in the log:
       // this route is public (T-16, CA-NT-07).
-      this.logger.warn(`Database check failed: ${(error as Error).message}`);
+      const reason =
+        error instanceof Error ? error.message : "a non-error value was thrown";
+      this.logger.warn(`Database check failed: ${reason}`);
     }
 
     const totalMemory = os.totalmem();

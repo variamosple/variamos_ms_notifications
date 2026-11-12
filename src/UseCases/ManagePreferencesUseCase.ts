@@ -11,23 +11,23 @@ export interface UpdatePreferencesInput {
 export class ManagePreferencesUseCase {
   constructor(private readonly preferencesRepo: IUserPreferencesRepository) {}
 
-  public async get(userId: string): Promise<UserPreferences> {
-    requireRecipient(userId);
-    const preferences = await this.preferencesRepo.findByUserId(userId);
+  public async get(userId: string | undefined): Promise<UserPreferences> {
+    const recipientId = requireRecipient(userId);
+    const preferences = await this.preferencesRepo.findByUserId(recipientId);
     if (!preferences) {
-      return UserPreferences.defaultsFor(userId);
+      return UserPreferences.defaultsFor(recipientId);
     }
     return preferences;
   }
 
   public async update(
-    userId: string,
+    userId: string | undefined,
     input: UpdatePreferencesInput,
   ): Promise<UserPreferences> {
-    requireRecipient(userId);
+    const recipientId = requireRecipient(userId);
     const preferences =
-      (await this.preferencesRepo.findByUserId(userId)) ??
-      UserPreferences.defaultsFor(userId);
+      (await this.preferencesRepo.findByUserId(recipientId)) ??
+      UserPreferences.defaultsFor(recipientId);
 
     if (input.emailEnabled !== undefined) {
       if (input.emailEnabled) {
