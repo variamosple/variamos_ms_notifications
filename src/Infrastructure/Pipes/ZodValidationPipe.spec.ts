@@ -46,4 +46,28 @@ describe("ZodValidationPipe", () => {
       errors: [{ path: ["value"], message: "Invalid input" }],
     });
   });
+
+  it("answers 400 without details when the schema fails otherwise, and keeps the cause", () => {
+    const failure = new TypeError("broken transform");
+    const brokenPipe = new ZodValidationPipe(
+      z.string().transform(() => {
+        throw failure;
+      }),
+    );
+
+    let thrown: unknown;
+    try {
+      brokenPipe.transform("text");
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    expect((thrown as BadRequestException).getResponse()).toEqual({
+      statusCode: 400,
+      message: "Validation failed",
+      error: "Bad Request",
+    });
+    expect((thrown as BadRequestException).cause).toBe(failure);
+  });
 });
