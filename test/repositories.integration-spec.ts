@@ -290,7 +290,7 @@ describe("Repositories (Integration)", () => {
         "inbox",
       );
       expect(inboxList).toHaveLength(1);
-      expect(inboxList[0].id).toBe("10000000-1234-5678-9012-36689f94b8cf");
+      expect(inboxList[0]?.id).toBe("10000000-1234-5678-9012-36689f94b8cf");
 
       // Trash check (deletedAt is not null)
       const trashList = await notificationRepo.findByRecipient(
@@ -300,7 +300,7 @@ describe("Repositories (Integration)", () => {
         "trash",
       );
       expect(trashList).toHaveLength(1);
-      expect(trashList[0].id).toBe("20000000-1234-5678-9012-36689f94b8cf");
+      expect(trashList[0]?.id).toBe("20000000-1234-5678-9012-36689f94b8cf");
     });
 
     it("should count unread and mark all as read for a recipient", async () => {

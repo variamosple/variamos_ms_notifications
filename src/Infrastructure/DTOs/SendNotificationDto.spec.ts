@@ -71,7 +71,7 @@ describe("SendNotificationSchema recipients", () => {
     const result = send({ userIds: ["u-1", ""] });
 
     expect(result.success).toBe(false);
-    expect(result.error?.issues[0].path).toEqual(["recipients", "userIds", 1]);
+    expect(result.error?.issues[0]?.path).toEqual(["recipients", "userIds", 1]);
   });
 
   it(`refuses more than ${MAX_ROLES} roles with one issue`, () => {
@@ -80,7 +80,7 @@ describe("SendNotificationSchema recipients", () => {
     const result = send({ userIds: ["u-1"], roles });
 
     expect(result.error?.issues).toHaveLength(1);
-    expect(result.error?.issues[0].path).toEqual(["recipients", "roles"]);
+    expect(result.error?.issues[0]?.path).toEqual(["recipients", "roles"]);
   });
 });
 
