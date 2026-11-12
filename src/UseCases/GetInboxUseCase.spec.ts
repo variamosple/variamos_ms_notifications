@@ -15,28 +15,28 @@ describe("GetInboxUseCase", () => {
 
   it("should retrieve notifications for recipient in the specified folder", async () => {
     const notifications = [
-      new Notification(
-        "1",
-        "user-1",
-        null,
-        "k",
-        {},
-        {},
-        false,
-        null,
-        new Date(),
-      ),
-      new Notification(
-        "2",
-        "user-1",
-        null,
-        "k",
-        {},
-        {},
-        false,
-        null,
-        new Date(),
-      ),
+      new Notification({
+        id: "1",
+        recipientId: "user-1",
+        actorId: null,
+        templateKey: "k",
+        variables: {},
+        metadata: {},
+        read: false,
+        readTime: null,
+        createdAt: new Date(),
+      }),
+      new Notification({
+        id: "2",
+        recipientId: "user-1",
+        actorId: null,
+        templateKey: "k",
+        variables: {},
+        metadata: {},
+        read: false,
+        readTime: null,
+        createdAt: new Date(),
+      }),
     ];
 
     notificationRepo.findByRecipient.mockResolvedValue(notifications);

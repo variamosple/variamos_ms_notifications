@@ -12,7 +12,10 @@ import { GetInboxUseCase } from "../../UseCases/GetInboxUseCase.js";
 import { ManagePreferencesUseCase } from "../../UseCases/ManagePreferencesUseCase.js";
 import { MarkAllAsReadUseCase } from "../../UseCases/MarkAllAsReadUseCase.js";
 import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
-import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
+import {
+  type SendNotificationStores,
+  SendNotificationUseCase,
+} from "../../UseCases/SendNotificationUseCase.js";
 import {
   ACCESS_CONTROL_MODE,
   ACCESS_CONTROL_MODE_TOKEN,
@@ -23,7 +26,7 @@ import {
   RATE_LIMIT,
   UserAwareThrottlerGuard,
 } from "../Auth/UserAwareThrottlerGuard.js";
-import { NotificationController } from "../Controllers/NotificationController.js";
+import { NOTIFICATION_CONTROLLERS } from "../Controllers/notificationControllers.js";
 import { DatabaseModule } from "../Persistence/TypeORM/database.module.js";
 import { UserServiceHttpClient } from "../Services/UserServiceHttpClient.js";
 import {
@@ -34,13 +37,14 @@ import {
   NOTIFICATION_CHANNEL,
   NOTIFICATION_REPOSITORY,
   NOTIFICATION_TEMPLATE_REPOSITORY,
+  SEND_NOTIFICATION_STORES,
   USER_PREFERENCES_REPOSITORY,
   USER_SERVICE,
 } from "./injectionTokens.js";
 
 @Module({
   imports: [DatabaseModule, ThrottlerModule.forRoot([RATE_LIMIT])],
-  controllers: [NotificationController],
+  controllers: NOTIFICATION_CONTROLLERS,
   providers: [
     AccessTokenVerifier,
     { provide: ACCESS_CONTROL_MODE_TOKEN, useValue: ACCESS_CONTROL_MODE },
@@ -61,28 +65,35 @@ import {
     },
     // Factory Providers for Use Cases to decouple them from NestJS framework
     {
-      provide: SendNotificationUseCase,
+      provide: SEND_NOTIFICATION_STORES,
       useFactory: (
         notificationRepo: INotificationRepository,
         preferencesRepo: IUserPreferencesRepository,
         templateRepo: INotificationTemplateRepository,
-        userService: IUserService,
-        notificationChannel: INotificationChannel,
-      ) =>
-        new SendNotificationUseCase(
-          notificationRepo,
-          preferencesRepo,
-          templateRepo,
-          userService,
-          notificationChannel,
-        ),
+      ): SendNotificationStores => ({
+        notificationRepo,
+        preferencesRepo,
+        templateRepo,
+      }),
       inject: [
         NOTIFICATION_REPOSITORY,
         USER_PREFERENCES_REPOSITORY,
         NOTIFICATION_TEMPLATE_REPOSITORY,
-        USER_SERVICE,
-        NOTIFICATION_CHANNEL,
       ],
+    },
+    {
+      provide: SendNotificationUseCase,
+      useFactory: (
+        stores: SendNotificationStores,
+        userService: IUserService,
+        notificationChannel: INotificationChannel,
+      ) =>
+        new SendNotificationUseCase({
+          ...stores,
+          userService,
+          notificationChannel,
+        }),
+      inject: [SEND_NOTIFICATION_STORES, USER_SERVICE, NOTIFICATION_CHANNEL],
     },
     {
       provide: GetInboxUseCase,

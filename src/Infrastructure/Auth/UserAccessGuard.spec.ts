@@ -10,7 +10,7 @@ import { ManagePreferencesUseCase } from "../../UseCases/ManagePreferencesUseCas
 import { MarkAllAsReadUseCase } from "../../UseCases/MarkAllAsReadUseCase.js";
 import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
 import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
-import { NotificationController } from "../Controllers/NotificationController.js";
+import { NOTIFICATION_CONTROLLERS } from "../Controllers/notificationControllers.js";
 import {
   ACCESS_CONTROL_MODE,
   ACCESS_CONTROL_MODE_TOKEN,
@@ -30,7 +30,7 @@ const verifier = {
 const createApp = async (mode: AccessControlMode) => {
   const stub = { execute: vi.fn(), get: vi.fn(), update: vi.fn() };
   const moduleRef = await Test.createTestingModule({
-    controllers: [NotificationController],
+    controllers: NOTIFICATION_CONTROLLERS,
     providers: [
       { provide: SendNotificationUseCase, useValue: send },
       { provide: GetInboxUseCase, useValue: inbox },

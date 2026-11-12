@@ -117,17 +117,17 @@ describe("Repositories (Integration)", () => {
 
   describe("NotificationRepository", () => {
     it("should save, find by id, and save many notifications", async () => {
-      const notif = new Notification(
-        "42a7b62e-1234-5678-9012-36689f94b8cf",
-        "user-1",
-        "actor-1",
-        "key-1",
-        { name: "Nathan" },
-        { tags: ["test"] },
-        false,
-        null,
-        new Date(),
-      );
+      const notif = new Notification({
+        id: "42a7b62e-1234-5678-9012-36689f94b8cf",
+        recipientId: "user-1",
+        actorId: "actor-1",
+        templateKey: "key-1",
+        variables: { name: "Nathan" },
+        metadata: { tags: ["test"] },
+        read: false,
+        readTime: null,
+        createdAt: new Date(),
+      });
 
       await notificationRepo.save(notif);
 
@@ -140,17 +140,17 @@ describe("Repositories (Integration)", () => {
         metadata: { tags: ["test"] },
       });
 
-      const notif2 = new Notification(
-        "bebfbd90-1234-5678-9012-36689f94b8cf",
-        "user-1",
-        null,
-        "key-1",
-        {},
-        {},
-        false,
-        null,
-        new Date(),
-      );
+      const notif2 = new Notification({
+        id: "bebfbd90-1234-5678-9012-36689f94b8cf",
+        recipientId: "user-1",
+        actorId: null,
+        templateKey: "key-1",
+        variables: {},
+        metadata: {},
+        read: false,
+        readTime: null,
+        createdAt: new Date(),
+      });
 
       const saved = await notificationRepo.saveMany([notif2]);
       const found2 = await notificationRepo.findById(
@@ -161,17 +161,17 @@ describe("Repositories (Integration)", () => {
 
     it("saves a batch in one INSERT, all or none (EV-101, OPT-04)", async () => {
       const notifAt = (id: string) =>
-        new Notification(
+        new Notification({
           id,
-          "user-1",
-          null,
-          "key-1",
-          { n: [1, { a: null }] },
-          {},
-          false,
-          null,
-          new Date("2026-10-25T10:00:00Z"),
-        );
+          recipientId: "user-1",
+          actorId: null,
+          templateKey: "key-1",
+          variables: { n: [1, { a: null }] },
+          metadata: {},
+          read: false,
+          readTime: null,
+          createdAt: new Date("2026-10-25T10:00:00Z"),
+        });
       const existing = notifAt("11111111-1234-4678-9012-36689f94b8cf");
       await notificationRepo.saveMany([existing]);
 
@@ -209,19 +209,19 @@ describe("Repositories (Integration)", () => {
 
     it("saves one notification per send key and recipient, and returns only those saved (EV-99)", async () => {
       const keyed = (id: string, recipientId: string, eventId: string | null) =>
-        new Notification(
+        new Notification({
           id,
           recipientId,
-          null,
-          "key-1",
-          {},
-          {},
-          false,
-          null,
-          new Date("2026-11-10T10:00:00Z"),
-          null,
+          actorId: null,
+          templateKey: "key-1",
+          variables: {},
+          metadata: {},
+          read: false,
+          readTime: null,
+          createdAt: new Date("2026-11-10T10:00:00Z"),
+          trashTime: null,
           eventId,
-        );
+        });
 
       const first = await notificationRepo.saveMany([
         keyed("44444444-1234-4678-9012-000000000001", "user-1", "event-1"),
@@ -255,30 +255,30 @@ describe("Repositories (Integration)", () => {
     });
 
     it("should support inbox/trash folders and pagination", async () => {
-      const notifInbox = new Notification(
-        "10000000-1234-5678-9012-36689f94b8cf",
-        "user-1",
-        null,
-        "key-1",
-        {},
-        {},
-        false,
-        null,
-        new Date("2026-08-27T10:00:00Z"),
-      );
+      const notifInbox = new Notification({
+        id: "10000000-1234-5678-9012-36689f94b8cf",
+        recipientId: "user-1",
+        actorId: null,
+        templateKey: "key-1",
+        variables: {},
+        metadata: {},
+        read: false,
+        readTime: null,
+        createdAt: new Date("2026-08-27T10:00:00Z"),
+      });
 
-      const notifTrash = new Notification(
-        "20000000-1234-5678-9012-36689f94b8cf",
-        "user-1",
-        null,
-        "key-1",
-        {},
-        {},
-        true,
-        new Date(),
-        new Date("2026-08-27T11:00:00Z"),
-        new Date("2026-08-27T12:00:00Z"), // deletedAt
-      );
+      const notifTrash = new Notification({
+        id: "20000000-1234-5678-9012-36689f94b8cf",
+        recipientId: "user-1",
+        actorId: null,
+        templateKey: "key-1",
+        variables: {},
+        metadata: {},
+        read: true,
+        readTime: new Date(),
+        createdAt: new Date("2026-08-27T11:00:00Z"),
+        trashTime: new Date("2026-08-27T12:00:00Z"), // deletedAt
+      });
 
       await notificationRepo.saveMany([notifInbox, notifTrash]);
 
@@ -304,29 +304,29 @@ describe("Repositories (Integration)", () => {
     });
 
     it("should count unread and mark all as read for a recipient", async () => {
-      const notif1 = new Notification(
-        "30000000-1234-5678-9012-36689f94b8cf",
-        "user-1",
-        null,
-        "key-1",
-        {},
-        {},
-        false,
-        null,
-        new Date(),
-      );
+      const notif1 = new Notification({
+        id: "30000000-1234-5678-9012-36689f94b8cf",
+        recipientId: "user-1",
+        actorId: null,
+        templateKey: "key-1",
+        variables: {},
+        metadata: {},
+        read: false,
+        readTime: null,
+        createdAt: new Date(),
+      });
 
-      const notif2 = new Notification(
-        "40000000-1234-5678-9012-36689f94b8cf",
-        "user-1",
-        null,
-        "key-1",
-        {},
-        {},
-        false,
-        null,
-        new Date(),
-      );
+      const notif2 = new Notification({
+        id: "40000000-1234-5678-9012-36689f94b8cf",
+        recipientId: "user-1",
+        actorId: null,
+        templateKey: "key-1",
+        variables: {},
+        metadata: {},
+        read: false,
+        readTime: null,
+        createdAt: new Date(),
+      });
 
       await notificationRepo.saveMany([notif1, notif2]);
 
@@ -340,18 +340,18 @@ describe("Repositories (Integration)", () => {
     });
 
     it("should permanently empty notifications in trash", async () => {
-      const notifTrash = new Notification(
-        "50000000-1234-5678-9012-36689f94b8cf",
-        "user-1",
-        null,
-        "key-1",
-        {},
-        {},
-        false,
-        null,
-        new Date(),
-        new Date(), // deletedAt
-      );
+      const notifTrash = new Notification({
+        id: "50000000-1234-5678-9012-36689f94b8cf",
+        recipientId: "user-1",
+        actorId: null,
+        templateKey: "key-1",
+        variables: {},
+        metadata: {},
+        read: false,
+        readTime: null,
+        createdAt: new Date(),
+        trashTime: new Date(), // deletedAt
+      });
 
       await notificationRepo.save(notifTrash);
 
@@ -375,17 +375,17 @@ describe("Repositories (Integration)", () => {
     });
 
     it("saves the trash date of a notification moved to the trash", async () => {
-      const notif = new Notification(
-        "60000000-1234-5678-9012-36689f94b8cf",
-        "user-1",
-        null,
-        "key-1",
-        {},
-        {},
-        false,
-        null,
-        new Date(),
-      );
+      const notif = new Notification({
+        id: "60000000-1234-5678-9012-36689f94b8cf",
+        recipientId: "user-1",
+        actorId: null,
+        templateKey: "key-1",
+        variables: {},
+        metadata: {},
+        read: false,
+        readTime: null,
+        createdAt: new Date(),
+      });
 
       await notificationRepo.save(notif);
 
@@ -407,17 +407,17 @@ describe("Repositories (Integration)", () => {
 
   describe("NotificationRepository scope (CA-NT-01)", () => {
     const unread = (id: string, recipientId: string) =>
-      new Notification(
+      new Notification({
         id,
         recipientId,
-        null,
-        "key-1",
-        {},
-        {},
-        false,
-        null,
-        new Date(),
-      );
+        actorId: null,
+        templateKey: "key-1",
+        variables: {},
+        metadata: {},
+        read: false,
+        readTime: null,
+        createdAt: new Date(),
+      });
 
     beforeEach(async () => {
       await notificationRepo.saveMany([
@@ -462,17 +462,17 @@ describe("Repositories (Integration)", () => {
         Array.from(
           { length: 25 },
           (_, i) =>
-            new Notification(
-              `${String(i).padStart(8, "0")}-1234-4678-9012-36689f94b8cf`,
-              "user-p",
-              null,
-              "key-1",
-              {},
-              {},
-              false,
-              null,
-              new Date(base + i * 60_000),
-            ),
+            new Notification({
+              id: `${String(i).padStart(8, "0")}-1234-4678-9012-36689f94b8cf`,
+              recipientId: "user-p",
+              actorId: null,
+              templateKey: "key-1",
+              variables: {},
+              metadata: {},
+              read: false,
+              readTime: null,
+              createdAt: new Date(base + i * 60_000),
+            }),
         ),
       );
 

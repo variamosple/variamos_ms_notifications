@@ -20,7 +20,7 @@ import { ManagePreferencesUseCase } from "../../UseCases/ManagePreferencesUseCas
 import { MarkAllAsReadUseCase } from "../../UseCases/MarkAllAsReadUseCase.js";
 import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
 import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
-import { NotificationController } from "./NotificationController.js";
+import { NOTIFICATION_CONTROLLERS } from "./notificationControllers.js";
 
 /**
  * Characterization tests (EV-110 lot 1): they pin the current HTTP contract
@@ -32,17 +32,17 @@ const N1 = "11111111-1111-4111-8111-111111111111";
 const CREATED = new Date("2026-10-29T10:00:00.000Z");
 const READ = new Date("2026-10-29T11:00:00.000Z");
 const readNotification = () =>
-  new Notification(
-    N1,
-    "user-1",
-    "admin-1",
-    "welcome",
-    { name: "Ana" },
-    { link: "/bugs" },
-    true,
-    READ,
-    CREATED,
-  );
+  new Notification({
+    id: N1,
+    recipientId: "user-1",
+    actorId: "admin-1",
+    templateKey: "welcome",
+    variables: { name: "Ana" },
+    metadata: { link: "/bugs" },
+    read: true,
+    readTime: READ,
+    createdAt: CREATED,
+  });
 // Every field a client receives, in JSON
 const READ_NOTIFICATION_BODY = {
   id: N1,
@@ -76,7 +76,7 @@ describe("NotificationController HTTP contract", () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      controllers: [NotificationController],
+      controllers: NOTIFICATION_CONTROLLERS,
       providers: [
         { provide: SendNotificationUseCase, useValue: useCases.send },
         { provide: GetInboxUseCase, useValue: useCases.inbox },

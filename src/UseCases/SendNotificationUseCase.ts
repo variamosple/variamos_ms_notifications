@@ -33,14 +33,33 @@ const chunks = <T>(items: T[], size: number): T[][] =>
     items.slice(i * size, (i + 1) * size),
   );
 
+/** The stores a send reads and writes. */
+export interface SendNotificationStores {
+  notificationRepo: INotificationRepository;
+  preferencesRepo: IUserPreferencesRepository;
+  templateRepo: INotificationTemplateRepository;
+}
+
+/** Everything a send uses: its stores, the user service and the channel. */
+export interface SendNotificationDependencies extends SendNotificationStores {
+  userService: IUserService;
+  notificationChannel: INotificationChannel;
+}
+
 export class SendNotificationUseCase {
-  constructor(
-    private readonly notificationRepo: INotificationRepository,
-    private readonly preferencesRepo: IUserPreferencesRepository,
-    private readonly templateRepo: INotificationTemplateRepository,
-    private readonly userService: IUserService,
-    private readonly notificationChannel: INotificationChannel,
-  ) {}
+  private readonly notificationRepo: INotificationRepository;
+  private readonly preferencesRepo: IUserPreferencesRepository;
+  private readonly templateRepo: INotificationTemplateRepository;
+  private readonly userService: IUserService;
+  private readonly notificationChannel: INotificationChannel;
+
+  constructor(dependencies: SendNotificationDependencies) {
+    this.notificationRepo = dependencies.notificationRepo;
+    this.preferencesRepo = dependencies.preferencesRepo;
+    this.templateRepo = dependencies.templateRepo;
+    this.userService = dependencies.userService;
+    this.notificationChannel = dependencies.notificationChannel;
+  }
 
   public async execute(input: SendNotificationInput): Promise<Notification[]> {
     // 1. Retrieve the notification template
@@ -89,19 +108,19 @@ export class SendNotificationUseCase {
       )
       .map(
         (recipientId) =>
-          new Notification(
-            randomUUID(),
+          new Notification({
+            id: randomUUID(),
             recipientId,
-            input.actorId || null,
-            input.templateKey,
-            input.variables,
-            input.metadata,
-            false, // isRead
-            null, // readAt
-            new Date(), // createdAt
-            null, // deletedAt
-            input.eventId ?? null,
-          ),
+            actorId: input.actorId || null,
+            templateKey: input.templateKey,
+            variables: input.variables,
+            metadata: input.metadata,
+            read: false,
+            readTime: null,
+            createdAt: new Date(),
+            trashTime: null,
+            eventId: input.eventId ?? null,
+          }),
       );
 
     // 5. Save by batch, then send each saved batch to the active channels

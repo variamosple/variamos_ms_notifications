@@ -25,17 +25,17 @@ describe("NotificationNotFoundError", () => {
 });
 
 describe("Notification.belongsTo", () => {
-  const notification = new Notification(
-    "n-1",
-    "user-1",
-    null,
-    "welcome",
-    {},
-    {},
-    false,
-    null,
-    new Date(),
-  );
+  const notification = new Notification({
+    id: "n-1",
+    recipientId: "user-1",
+    actorId: null,
+    templateKey: "welcome",
+    variables: {},
+    metadata: {},
+    read: false,
+    readTime: null,
+    createdAt: new Date(),
+  });
 
   it("is true for its recipient only", () => {
     expect(notification.belongsTo("user-1")).toBe(true);

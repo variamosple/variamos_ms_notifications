@@ -22,17 +22,17 @@ describe("MarkAsReadUseCase", () => {
   });
 
   it("should mark notification as read and save it", async () => {
-    const notif = new Notification(
-      "id-1",
-      "user-1",
-      null,
-      "key-1",
-      {},
-      {},
-      false,
-      null,
-      new Date(),
-    );
+    const notif = new Notification({
+      id: "id-1",
+      recipientId: "user-1",
+      actorId: null,
+      templateKey: "key-1",
+      variables: {},
+      metadata: {},
+      read: false,
+      readTime: null,
+      createdAt: new Date(),
+    });
 
     notificationRepo.findById.mockResolvedValue(notif);
     notificationRepo.save.mockImplementation(async (n) => n);
