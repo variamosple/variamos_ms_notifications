@@ -41,7 +41,8 @@ export class NotificationTemplates1794268800001 implements MigrationInterface {
     }
   }
 
-  // Nothing is removed: the same rows may have been there before this
-  // migration, and a send naming them would then be refused
-  public async down(): Promise<void> {}
+  public async down(): Promise<void> {
+    // Nothing is removed: the same rows may have been there before this
+    // migration, and a send naming them would then be refused
+  }
 }

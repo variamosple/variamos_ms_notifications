@@ -42,12 +42,12 @@ describe("Repositories (Integration)", () => {
     );
   }, 60000); // 60s timeout for pulling the postgres docker image and starting it
 
-  afterAll(async () => {
-    await dbHelper.stop();
-  });
-
   beforeEach(async () => {
     await dbHelper.clear();
+  });
+
+  afterAll(async () => {
+    await dbHelper.stop();
   });
 
   describe("UserPreferencesRepository", () => {
@@ -84,7 +84,9 @@ describe("Repositories (Integration)", () => {
         "absent",
       ]);
 
-      expect(found.map((p) => p.userId).sort()).toEqual(["user-1", "user-2"]);
+      expect(
+        found.map((p) => p.userId).sort((a, b) => a.localeCompare(b)),
+      ).toEqual(["user-1", "user-2"]);
       expect(await preferencesRepo.findByUserIds([])).toEqual([]);
     });
   });

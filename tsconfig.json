@@ -17,6 +17,8 @@
     "skipLibCheck": true,
     "strict": true,
     "strictNullChecks": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
     "forceConsistentCasingInFileNames": true,
     "types": ["vitest/globals"]
   }

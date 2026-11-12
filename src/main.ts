@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module.js";
@@ -13,6 +14,10 @@ async function bootstrap(): Promise<void> {
 
 // A service that cannot start stops, with the reason in its log
 bootstrap().catch((error: unknown) => {
-  console.error("The notification service could not start", error);
+  Logger.error(
+    "The notification service could not start",
+    error instanceof Error ? error.stack : String(error),
+    "Bootstrap",
+  );
   process.exit(1);
 });
