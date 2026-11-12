@@ -25,11 +25,9 @@ export class ManagePreferencesUseCase {
     input: UpdatePreferencesInput,
   ): Promise<UserPreferences> {
     requireRecipient(userId);
-    let preferences = await this.preferencesRepo.findByUserId(userId);
-
-    if (!preferences) {
-      preferences = UserPreferences.defaultsFor(userId);
-    }
+    const preferences =
+      (await this.preferencesRepo.findByUserId(userId)) ??
+      UserPreferences.defaultsFor(userId);
 
     if (input.emailEnabled !== undefined) {
       if (input.emailEnabled) {

@@ -42,9 +42,7 @@ export class Notification {
   }
 
   public moveToTrash(): void {
-    if (!this.trashTime) {
-      this.trashTime = new Date();
-    }
+    this.trashTime ??= new Date();
   }
 
   public restoreFromTrash(): void {
