@@ -1,5 +1,5 @@
 # Build stage: the development dependencies compile the code, then leave
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 
 WORKDIR /service
 # Dependencies first: a change of the source code reuses this layer
@@ -12,7 +12,7 @@ COPY src ./src
 RUN npm run build && npm prune --omit=dev
 
 # Run stage: the compiled code and the production dependencies only (EV-102)
-FROM node:24-alpine
+FROM node:26-alpine
 
 WORKDIR /service
 # package.json declares the ES modules of dist
