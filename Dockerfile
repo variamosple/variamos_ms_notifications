@@ -20,6 +20,10 @@ COPY --from=build /service/package.json ./package.json
 COPY --from=build /service/node_modules ./node_modules
 COPY --from=build /service/dist ./dist
 
+# The service reads and writes no file: it runs as the image's node user
+# rather than root (SonarCloud S6471)
+USER node
+
 EXPOSE 3005
 
 CMD ["node", "dist/main.js"]
