@@ -22,6 +22,7 @@
     "check-arch": "dependency-cruiser --config .dependency-cruiser.cjs src/",
     "typecheck": "tsc --noEmit",
     "find-deadcode": "knip",
+    "spell": "cspell --no-progress --dot --gitignore \"**/*.{ts,js,cjs,mjs,json,jsonc,md,yml,yaml,sh}\" \"**/Dockerfile*\"",
     "check-updates": "taze",
     "prepare": "husky"
   },

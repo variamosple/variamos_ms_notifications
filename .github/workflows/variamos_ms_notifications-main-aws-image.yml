@@ -1,3 +1,5 @@
+# DOKCERHUB: name of the organization's registry secrets, shared by many repositories
+# cspell:ignore DOKCERHUB
 # Last updated: 20260831:23:05
 
 name: variamos_ms_notifications-main-aws-image
