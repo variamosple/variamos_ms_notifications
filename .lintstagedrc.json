@@ -1,5 +1,8 @@
 {
   "*.{ts,js,cjs,mjs,json,jsonc}": [
-    "biome check --write --no-errors-on-unmatched"
-  ]
+    "biome check --write --no-errors-on-unmatched",
+    "cspell --no-must-find-files"
+  ],
+  "*.{md,yml,yaml,sh}": ["cspell --no-must-find-files"],
+  "**/Dockerfile*": ["cspell --no-must-find-files"]
 }

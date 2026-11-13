@@ -9,7 +9,7 @@ export class MarkAsReadUseCase {
   /**
    * With an actor, only the actor's own notification can be marked; any
    * other one answers "not found". Without one (observe mode, ADR-0001),
-   * the previous behaviour is kept.
+   * the previous behavior is kept.
    */
   public async execute(id: string, actor?: Principal): Promise<Notification> {
     const notification = await this.notificationRepo.findById(id);
