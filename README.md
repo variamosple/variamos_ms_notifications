@@ -105,20 +105,22 @@ All routes are prefixed with `/notifications`.
 
 Clients connect using Socket.io to receive real-time notifications.
 
-*   **URL:** `ws://localhost:3000`
-*   **Handshake:** Pass the `userId` in the handshake (auth or query params):
+*   **URL:** `ws://localhost:3000`, on the namespace `/` or `/variamos_ms_notifications` (a notification is sent once on each).
+*   **Handshake:** pass the access token issued by `variamos_ms_admin` in `auth.token`. The client joins the room of the user of the token; a user id sent by the client is ignored. Without a valid token the connection is refused (the service runs in "enforce" mode, `src/Infrastructure/Auth/AccessControlMode.ts`).
     ```javascript
     import { io } from "socket.io-client";
     const socket = io("http://localhost:3000", {
-      query: { userId: "user-uuid-1" }
+      auth: { token: accessToken },
+      transports: ["websocket"],
     });
     ```
-*   **Event:** Listen to the `"notification"` event:
+*   **Event:** listen to the `"notification"` event. Its message has six fields, as in [`notification-realtime.example.json`](src/Infrastructure/WebSockets/notification-realtime.example.json); `createdAt` arrives as an ISO text.
     ```javascript
-    socket.on("notification", (data) => {
-      console.log("Received notification:", data);
+    socket.on("notification", ({ id, templateKey, variables, metadata, isRead, createdAt }) => {
+      console.log("Received notification:", templateKey, variables);
     });
     ```
+*   **Contract:** the same example is kept in `variamos_components` (`lib/Context/notification-realtime.example.json`). The test of `NotificationGateway.send` checks that the service emits it, and the test of the library checks that it reads it. Change both copies together.
 
 ---
 

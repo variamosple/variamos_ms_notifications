@@ -1,0 +1,8 @@
+{
+  "id": "n-1",
+  "templateKey": "welcome",
+  "variables": { "name": "Ana" },
+  "metadata": { "source": "admin" },
+  "isRead": false,
+  "createdAt": "2026-10-16T10:00:00.000Z"
+}

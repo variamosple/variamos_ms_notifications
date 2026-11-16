@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { Logger } from "@nestjs/common";
 import type { Server, Socket } from "socket.io";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -167,6 +169,27 @@ describe("NotificationGateway.send", () => {
     // Once per namespace: a client connected to one receives it once
     expect(namespace.emit).toHaveBeenCalledTimes(1);
     expect(rootServer.emit).toHaveBeenCalledTimes(1);
+  });
+
+  // CA-NT-18: the same example is kept in variamos_components
+  // (lib/Context/notification-realtime.example.json), whose test reads it as
+  // the browser receives it. A change here must be made there too.
+  it("emits, once serialized, the message of the shared example", async () => {
+    const example: unknown = JSON.parse(
+      readFileSync(
+        join(import.meta.dirname, "notification-realtime.example.json"),
+        "utf8",
+      ),
+    );
+    const gateway = namespaceGateway();
+    const namespace = fakeServer();
+    setServer(gateway, namespace.server);
+
+    await gateway.send(notification());
+
+    const [, payload] = namespace.emit.mock.calls[0] as [string, object];
+    // Socket.IO sends JSON: the date arrives as an ISO text
+    expect(JSON.parse(JSON.stringify(payload))).toEqual(example);
   });
 
   it("does not expose the recipient or the actor in the payload", async () => {
