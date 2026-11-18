@@ -15,6 +15,8 @@
     "lint": "biome check --error-on-warnings . && node scripts/check-suppressions.mjs",
     "lint:fix": "biome check --write .",
     "test": "vitest run",
+    "kit": "bash scripts/kit.sh start",
+    "kit:stop": "bash scripts/kit.sh stop",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
