@@ -79,6 +79,16 @@ jobs:
       run: |
         npm run test:e2e
 
+    # The image and the check of the publish workflow, before the merge
+    # (lot Q1)
+    - name: Build the image
+      run: |
+        docker build -t image-to-check .
+
+    - name: Check the image (Trivy, environment files and keys)
+      run: |
+        bash scripts/scan-image.sh image-to-check
+
     - name: Verify production build
       run: |
         npm run build

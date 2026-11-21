@@ -34,7 +34,8 @@
     "sonarqube",
     "trufflesecurity",
     "knip",
-    "vitest"
+    "vitest",
+    "aquasec"
   ],
   "ignorePaths": [
     "node_modules/**",
