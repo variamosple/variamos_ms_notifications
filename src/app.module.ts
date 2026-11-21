@@ -36,7 +36,9 @@ import {
           synchronize: false,
           migrations: NOTIFICATIONS_MIGRATIONS,
           migrationsTableName: NOTIFICATIONS_MIGRATIONS_TABLE,
-          migrationsRun: true,
+          // Applied by prepareDatabase at start, which first checks that
+          // this database may be written without being asked (ADM-N32)
+          migrationsRun: false,
           ssl: ssl ? { rejectUnauthorized: false } : false,
         };
       },

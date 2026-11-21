@@ -34,6 +34,8 @@ DATABASE_SSL=false
 NOTIFICATION_INTERNAL_TOKEN=your-shared-secret-token
 ```
 
+Outside production, the service does not migrate a remote database, nor the production database reached through a tunnel: the production database carries the setting `variamos.environment = 'production'`. `ALLOW_AUTOMATIC_WRITES_ON_REMOTE_DATABASE=true` allows the migrations anyway.
+
 ---
 
 ## Running it with the rest of the platform
