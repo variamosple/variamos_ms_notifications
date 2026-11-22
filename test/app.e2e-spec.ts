@@ -17,9 +17,13 @@ import { DbTestHelper } from "./db-test-helper.js";
 
 /** What the gateway sends to a connected user, as far as these tests read it */
 type SocketNotification = {
+  id: string;
+  isRead: boolean;
   templateKey: string;
   variables: Record<string, unknown>;
 };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 interface PostgresOptions {
   host?: string;
@@ -101,8 +105,15 @@ describe("AppModule (e2e)", () => {
     await dbHelper.stop();
   });
 
-  it("should initialize the application successfully", () => {
-    expect(app).toBeDefined();
+  it("starts with its database reachable", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/health")
+      .expect(HttpStatus.OK);
+    expect(response.body).toMatchObject({
+      status: "UP",
+      serviceName: "variamos_ms_notifications",
+      checks: { database: { status: "UP" } },
+    });
   });
 
   it("answers with the settings of main.ts: security headers, body limit (TST-NOTIF-07)", async () => {
@@ -329,7 +340,9 @@ describe("AppModule (e2e)", () => {
         .expect(HttpStatus.CREATED);
 
       const receivedPayload = await notificationReceived;
-      expect(receivedPayload).toBeDefined();
+      // A new, unread notification, sent to the room of its recipient
+      expect(receivedPayload.id).toMatch(UUID);
+      expect(receivedPayload.isRead).toBe(false);
       expect(receivedPayload.templateKey).toBe("test_template");
       expect(receivedPayload.variables).toEqual({ name: "WS Tester" });
 
@@ -370,7 +383,9 @@ describe("AppModule (e2e)", () => {
         .expect(HttpStatus.CREATED);
 
       const receivedPayload = await notificationReceived;
-      expect(receivedPayload).toBeDefined();
+      // A new, unread notification, sent to the room of its recipient
+      expect(receivedPayload.id).toMatch(UUID);
+      expect(receivedPayload.isRead).toBe(false);
       expect(receivedPayload.templateKey).toBe("test_template");
       expect(receivedPayload.variables).toEqual({ name: "Namespace Tester" });
 

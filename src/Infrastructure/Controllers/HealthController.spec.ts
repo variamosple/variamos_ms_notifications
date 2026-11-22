@@ -52,7 +52,11 @@ describe("HealthController", () => {
     expect(jsonResult.status).toBe("UP");
     expect(jsonResult.serviceName).toBe("variamos_ms_notifications");
     expect(jsonResult.checks.database.status).toBe("UP");
-    expect(jsonResult.checks.memory.percentage).toBeDefined();
+    // Share of the memory in use, in percent with one decimal
+    const { percentage } = jsonResult.checks.memory;
+    expect(percentage).toBeGreaterThan(0);
+    expect(percentage).toBeLessThanOrEqual(100);
+    expect(Number(percentage.toFixed(1))).toBe(percentage);
   });
 
   it("should return DEGRADED with 503 when database query fails, without the driver message", async () => {
