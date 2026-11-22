@@ -24,6 +24,13 @@ function extractUserId(client: Socket): string | null {
   return typeof raw === "string" && raw.trim() !== "" ? raw.trim() : null;
 }
 
+/** The room a connecting client joins, and until when it may stay there. */
+interface RoomAccess {
+  userId: string;
+  /** Absent in observe mode, where the client gives its own userId. */
+  expiresAt?: Date;
+}
+
 /**
  * Room to join for a connecting client: the user of a valid access token
  * (`handshake.auth.token`). Without one, "observe" mode keeps the userId the
@@ -34,12 +41,12 @@ async function resolveRoom(
   verifier: AccessTokenVerifier,
   mode: AccessControlMode,
   logger: Logger,
-): Promise<string | null> {
+): Promise<RoomAccess | null> {
   const token = client.handshake.auth?.token;
-  const principal = await verifier.verify(
+  const access = await verifier.verifyAccess(
     typeof token === "string" ? token : null,
   );
-  if (principal) return principal.userId;
+  if (access) return access;
   if (mode === "enforce") return null;
   const userId = extractUserId(client);
   if (userId) {
@@ -47,8 +54,11 @@ async function resolveRoom(
       `Observe mode: socket ${client.id} connected without a valid access token`,
     );
   }
-  return userId;
+  return userId ? { userId } : null;
 }
+
+// setTimeout takes at most 2^31 - 1 ms (about 24 days)
+const LONGEST_TIMER_MS = 2_147_483_647;
 
 /**
  * The connection logic of both namespaces (EV-99, CA-NT-10): a client joins
@@ -64,6 +74,9 @@ abstract class UserRoomGateway
 
   @WebSocketServer()
   private readonly server!: Server;
+
+  /** The end of the access token of each open socket, by socket id. */
+  private readonly expiries = new Map<string, NodeJS.Timeout>();
 
   protected constructor(
     private readonly verifier: AccessTokenVerifier,
@@ -82,13 +95,13 @@ abstract class UserRoomGateway
   }
 
   public async handleConnection(client: Socket): Promise<void> {
-    const userId = await resolveRoom(
+    const access = await resolveRoom(
       client,
       this.verifier,
       this.mode,
       this.logger,
     );
-    if (!userId) {
+    if (!access) {
       this.logger.warn(
         `Rejected socket connection on ${this.label} without a valid user: ${client.id}`,
       );
@@ -96,13 +109,40 @@ abstract class UserRoomGateway
       return;
     }
 
+    const { userId, expiresAt } = access;
     await client.join(userId);
+    if (expiresAt) this.closeAtExpiry(client, expiresAt);
     this.logger.log(
       `[${this.label}] User connected: userId=${userId}, socketId=${client.id}`,
     );
   }
 
+  /**
+   * Closes the connection when its access token expires (ADM-N19): the
+   * socket would otherwise stay in the room of its user for as long as it is
+   * open, after the account is disabled too. The transport is closed rather
+   * than the socket disconnected: socket.io clients then connect again by
+   * themselves, with a new token, while a disconnect would leave them off.
+   */
+  private closeAtExpiry(client: Socket, expiresAt: Date): void {
+    const delay = Math.min(
+      Math.max(expiresAt.getTime() - Date.now(), 0),
+      LONGEST_TIMER_MS,
+    );
+    const timer = setTimeout(() => {
+      this.expiries.delete(client.id);
+      this.logger.log(
+        `[${this.label}] Access token expired: closing socketId=${client.id}`,
+      );
+      client.conn.close();
+    }, delay);
+    timer.unref();
+    this.expiries.set(client.id, timer);
+  }
+
   public handleDisconnect(client: Socket): void {
+    clearTimeout(this.expiries.get(client.id));
+    this.expiries.delete(client.id);
     const userId = extractUserId(client);
     if (userId) {
       this.logger.log(

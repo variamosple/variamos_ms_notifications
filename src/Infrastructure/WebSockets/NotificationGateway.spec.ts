@@ -25,9 +25,11 @@ const fakeSocket = (handshake: {
     handshake: { auth: {}, query: {}, ...handshake },
     join: vi.fn(),
     disconnect: vi.fn(),
+    conn: { close: vi.fn() },
   }) as unknown as Socket & {
     join: ReturnType<typeof vi.fn>;
     disconnect: ReturnType<typeof vi.fn>;
+    conn: { close: ReturnType<typeof vi.fn> };
   };
 
 const fakeServer = () => {
@@ -36,10 +38,15 @@ const fakeServer = () => {
   return { server: { to } as unknown as Server, to, emit };
 };
 
+// When "valid-token" expires: far enough for the tests that do not wait
+let tokenExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
 // Verifier that knows one token: "valid-token" for "user-from-token"
 const verifier = {
-  verify: vi.fn(async (token: string | null | undefined) =>
-    token === "valid-token" ? { userId: "user-from-token" } : null,
+  verifyAccess: vi.fn(async (token: string | null | undefined) =>
+    token === "valid-token"
+      ? { userId: "user-from-token", expiresAt: tokenExpiresAt }
+      : null,
   ),
 } as unknown as AccessTokenVerifier;
 
@@ -140,6 +147,55 @@ describe.each([
     await createGateway("enforce").handleConnection(client);
 
     expect(client.join).toHaveBeenCalledWith("user-from-token");
+  });
+});
+
+describe.each([
+  ["RootNotificationGateway", rootGateway],
+  ["NotificationGateway", namespaceGateway],
+])("%s at the end of the access token (ADM-N19)", (_name, createGateway) => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(Logger.prototype, "log").mockImplementation(() => {});
+    tokenExpiresAt = new Date(Date.now() + 60_000);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("closes the connection when the token expires, not before", async () => {
+    const client = fakeSocket({ auth: { token: "valid-token" } });
+
+    await createGateway("enforce").handleConnection(client);
+    vi.advanceTimersByTime(59_999);
+    expect(client.conn.close).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+
+    // The transport, so that the client connects again with a new token
+    expect(client.conn.close).toHaveBeenCalledOnce();
+    expect(client.disconnect).not.toHaveBeenCalled();
+  });
+
+  it("forgets the end of a socket that disconnects first", async () => {
+    const client = fakeSocket({ auth: { token: "valid-token" } });
+    const gateway = createGateway("enforce");
+
+    await gateway.handleConnection(client);
+    gateway.handleDisconnect(client);
+    vi.advanceTimersByTime(120_000);
+
+    expect(client.conn.close).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("sets no end for a client of observe mode, which has no token", async () => {
+    const client = fakeSocket({ auth: { userId: "user-1" } });
+
+    await createGateway("observe").handleConnection(client);
+
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 
