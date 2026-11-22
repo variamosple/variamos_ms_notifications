@@ -33,9 +33,15 @@ describe("Notification", () => {
       createdAt: new Date(),
     });
 
+    const before = Date.now();
     notif.markAsRead();
+    const after = Date.now();
     expect(notif.isRead).toBe(true);
     const firstReadAt = notif.readAt;
+    // A read notification carries the time it was read, taken at the call
+    expect(firstReadAt).toBeInstanceOf(Date);
+    expect(firstReadAt?.getTime()).toBeGreaterThanOrEqual(before);
+    expect(firstReadAt?.getTime()).toBeLessThanOrEqual(after);
 
     notif.markAsRead();
     expect(notif.readAt).toBe(firstReadAt);

@@ -79,7 +79,100 @@ describe("SendNotificationUseCase", () => {
     expect(result[0]?.variables).toEqual({ name: "Tester" });
     expect(result[0]?.isRead).toBe(false);
     expect(notificationRepo.saveMany).toHaveBeenCalledTimes(1);
+    // Each recipient gets its own notification on the channel
     expect(notificationChannel.send).toHaveBeenCalledTimes(2);
+    expect(notificationChannel.send).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        recipientId: "user-1",
+        templateKey: "review_assigned",
+        variables: { name: "Tester" },
+        metadata: { refId: 10 },
+      }),
+    );
+    expect(notificationChannel.send).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        recipientId: "user-2",
+        templateKey: "review_assigned",
+      }),
+    );
+  });
+
+  describe("actor and duplicate recipients (TST-NOTIF-04)", () => {
+    beforeEach(() => {
+      templateRepo.findByKey.mockResolvedValue(
+        new NotificationTemplate(
+          "review_assigned",
+          "Title",
+          "Body",
+          new Date(),
+        ),
+      );
+      preferencesRepo.findByUserIds.mockResolvedValue([]);
+      notificationRepo.saveMany.mockImplementation(async (batch) => batch);
+    });
+
+    it("gives each notification the actor of the send", async () => {
+      const result = await useCase.execute({
+        recipients: { userIds: ["user-1", "user-2"] },
+        templateKey: "review_assigned",
+        variables: {},
+        metadata: {},
+        actorId: "actor-1",
+      });
+
+      expect(result.map((n) => n.actorId)).toEqual(["actor-1", "actor-1"]);
+      expect(notificationChannel.send).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientId: "user-1", actorId: "actor-1" }),
+      );
+    });
+
+    it.each([undefined, ""])(
+      "leaves the actor empty when the sender gives %j",
+      async (actorId) => {
+        const result = await useCase.execute({
+          recipients: { userIds: ["user-1"] },
+          templateKey: "review_assigned",
+          variables: {},
+          metadata: {},
+          actorId,
+        });
+
+        expect(result[0]?.actorId).toBeNull();
+      },
+    );
+
+    it("notifies a recipient named twice only once", async () => {
+      const result = await useCase.execute({
+        recipients: { userIds: ["user-1", "user-1", "user-2"] },
+        templateKey: "review_assigned",
+        variables: {},
+        metadata: {},
+      });
+
+      expect(result.map((n) => n.recipientId)).toEqual(["user-1", "user-2"]);
+      expect(preferencesRepo.findByUserIds).toHaveBeenCalledWith([
+        "user-1",
+        "user-2",
+      ]);
+      expect(notificationRepo.saveMany.mock.calls[0]?.[0]).toHaveLength(2);
+      expect(notificationChannel.send).toHaveBeenCalledTimes(2);
+    });
+
+    it("notifies a recipient also reached by a role only once", async () => {
+      userService.findUserIdsByRoles.mockResolvedValue(["user-1", "admin-1"]);
+
+      const result = await useCase.execute({
+        recipients: { userIds: ["user-1"], roles: ["administrator"] },
+        templateKey: "review_assigned",
+        variables: {},
+        metadata: {},
+      });
+
+      expect(result.map((n) => n.recipientId)).toEqual(["user-1", "admin-1"]);
+      expect(notificationChannel.send).toHaveBeenCalledTimes(2);
+    });
   });
 
   it("should resolve roles and send notifications to role members", async () => {
@@ -159,6 +252,9 @@ describe("SendNotificationUseCase", () => {
     expect(result[0]?.recipientId).toBe("user-2");
     expect(notificationRepo.saveMany.mock.calls[0]?.[0]).toHaveLength(1);
     expect(notificationChannel.send).toHaveBeenCalledTimes(1);
+    expect(notificationChannel.send).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientId: "user-2" }),
+    );
   });
 
   it("delivers a mandatory notification to a recipient who muted it (EV-99)", async () => {
@@ -211,6 +307,9 @@ describe("SendNotificationUseCase", () => {
     expect(result[0]?.isRead).toBe(false);
     // Verify that it still gets sent via websocket channel (default inAppEnabled is true)
     expect(notificationChannel.send).toHaveBeenCalledTimes(1);
+    expect(notificationChannel.send).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientId: "user-new" }),
+    );
   });
 
   it("should save notification but not send it via websocket if inAppEnabled is false", async () => {
