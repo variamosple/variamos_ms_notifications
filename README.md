@@ -187,7 +187,7 @@ docker run --name variamos-postgres -e POSTGRES_USER=variamos_user -e POSTGRES_P
 docker exec variamos-postgres psql -U variamos_user -d variamos_notifications -c "CREATE SCHEMA IF NOT EXISTS variamos"
 ```
 
-The tables are created by versioned migrations (`src/Infrastructure/Persistence/TypeORM/Migrations/`), applied at start-up and recorded in `notifications_migrations`. If a migration fails, the service does not start. TypeORM `synchronize` is never used: to change the schema, add a migration and list it in `Migrations/index.ts`; `test/migrations.integration-spec.ts` fails if the migrations and the entities disagree.
+The tables are created by versioned migrations (`src/Infrastructure/Persistence/TypeORM/Migrations/`), applied at start-up and recorded in `notifications_migrations`. If a migration fails, the service does not start. TypeORM `synchronize` is never used: to change the schema, add a migration and list it in `Migrations/index.ts`; `test/migrations.integration.spec.ts` fails if the migrations and the entities disagree.
 
 ### 2. Run the app
 ```bash

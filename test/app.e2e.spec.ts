@@ -5,6 +5,16 @@ import { SignJWT } from "jose";
 import { io, Socket } from "socket.io-client";
 import request from "supertest";
 import { DataSource } from "typeorm";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { AppModule } from "./../src/app.module.js";
 import {
   ACCESS_TOKEN_AUDIENCE,
@@ -24,6 +34,24 @@ type SocketNotification = {
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+// Longest wait for a socket event: under the 5 s of a test, so that a missing
+// event fails with its name instead of a bare timeout (TST-NOTIF-08)
+const SOCKET_WAIT_MS = 3000;
+
+/** The first time `client` emits `event`, or a failure naming it. */
+function nextEvent<T>(client: Socket, event: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`no "${event}" within ${SOCKET_WAIT_MS} ms`)),
+      SOCKET_WAIT_MS,
+    );
+    client.once(event, (data: T) => {
+      clearTimeout(timer);
+      resolve(data);
+    });
+  });
+}
 
 interface PostgresOptions {
   host?: string;
@@ -58,20 +86,14 @@ describe("AppModule (e2e)", () => {
     dataSource = await dbHelper.start();
     await dataSource.query("CREATE SCHEMA IF NOT EXISTS variamos;");
 
-    process.env.DATABASE_HOST = (dataSource.options as PostgresOptions).host;
-    process.env.DATABASE_PORT = String(
-      (dataSource.options as PostgresOptions).port,
-    );
-    process.env.DATABASE_USERNAME = (
-      dataSource.options as PostgresOptions
-    ).username;
-    process.env.DATABASE_PASSWORD = (
-      dataSource.options as PostgresOptions
-    ).password;
-    process.env.DATABASE_NAME = (
-      dataSource.options as PostgresOptions
-    ).database;
-    process.env.NOTIFICATION_INTERNAL_TOKEN = internalToken;
+    // Stubbed for the whole file, and given back after it (TST-NOTIF-11)
+    const options = dataSource.options as PostgresOptions;
+    vi.stubEnv("DATABASE_HOST", options.host);
+    vi.stubEnv("DATABASE_PORT", String(options.port));
+    vi.stubEnv("DATABASE_USERNAME", options.username);
+    vi.stubEnv("DATABASE_PASSWORD", options.password);
+    vi.stubEnv("DATABASE_NAME", options.database);
+    vi.stubEnv("NOTIFICATION_INTERNAL_TOKEN", internalToken);
   }, 60000);
 
   beforeEach(async () => {
@@ -95,13 +117,25 @@ describe("AppModule (e2e)", () => {
     await templateRepo.save(template);
   });
 
+  // Sockets opened by a test, closed after it even when it fails
+  const sockets: Socket[] = [];
+  const openSocket = (url: string, options: Parameters<typeof io>[1]) => {
+    const client = io(url, { ...options, autoConnect: false });
+    sockets.push(client);
+    return client;
+  };
+
   afterEach(async () => {
+    for (const client of sockets.splice(0)) {
+      client.close();
+    }
     if (app) {
       await app.close();
     }
   });
 
   afterAll(async () => {
+    vi.unstubAllEnvs();
     await dbHelper.stop();
   });
 
@@ -288,18 +322,12 @@ describe("AppModule (e2e)", () => {
     it("disconnects a socket without access token, even with a userId", async () => {
       await app.listen(0);
       const serverUrl = await app.getUrl();
-      const wsClient: Socket = io(serverUrl, {
-        autoConnect: false,
-        query: { userId: "user-1" },
-      });
+      const wsClient = openSocket(serverUrl, { query: { userId: "user-1" } });
 
-      const disconnected = new Promise<string>((resolve) => {
-        wsClient.on("disconnect", (reason) => resolve(reason));
-      });
+      const disconnected = nextEvent<string>(wsClient, "disconnect");
       wsClient.connect();
 
       await expect(disconnected).resolves.toBe("io server disconnect");
-      wsClient.close();
     });
   });
 
@@ -309,23 +337,17 @@ describe("AppModule (e2e)", () => {
       await app.listen(0);
       const serverUrl = await app.getUrl();
 
-      const wsClient: Socket = io(serverUrl, {
-        autoConnect: false,
+      const wsClient = openSocket(serverUrl, {
         auth: { token: await userToken("user-ws-1") },
       });
 
-      const connected = new Promise<void>((resolve) => {
-        wsClient.on("connect", () => resolve());
-      });
+      const connected = nextEvent<void>(wsClient, "connect");
       wsClient.connect();
       await connected;
 
-      const notificationReceived = new Promise<SocketNotification>(
-        (resolve) => {
-          wsClient.on("notification", (data) => {
-            resolve(data);
-          });
-        },
+      const notificationReceived = nextEvent<SocketNotification>(
+        wsClient,
+        "notification",
       );
 
       // Post notification to user-ws-1 via HTTP endpoint
@@ -345,31 +367,23 @@ describe("AppModule (e2e)", () => {
       expect(receivedPayload.isRead).toBe(false);
       expect(receivedPayload.templateKey).toBe("test_template");
       expect(receivedPayload.variables).toEqual({ name: "WS Tester" });
-
-      wsClient.disconnect();
     });
 
     it("should dispatch notification when client connects with /variamos_ms_notifications namespace", async () => {
       await app.listen(0);
       const serverUrl = await app.getUrl();
 
-      const wsClient: Socket = io(`${serverUrl}/variamos_ms_notifications`, {
-        autoConnect: false,
+      const wsClient = openSocket(`${serverUrl}/variamos_ms_notifications`, {
         auth: { token: await userToken("user-ws-2") },
       });
 
-      const connected = new Promise<void>((resolve) => {
-        wsClient.on("connect", () => resolve());
-      });
+      const connected = nextEvent<void>(wsClient, "connect");
       wsClient.connect();
       await connected;
 
-      const notificationReceived = new Promise<SocketNotification>(
-        (resolve) => {
-          wsClient.on("notification", (data) => {
-            resolve(data);
-          });
-        },
+      const notificationReceived = nextEvent<SocketNotification>(
+        wsClient,
+        "notification",
       );
 
       await request(app.getHttpServer())
@@ -388,8 +402,6 @@ describe("AppModule (e2e)", () => {
       expect(receivedPayload.isRead).toBe(false);
       expect(receivedPayload.templateKey).toBe("test_template");
       expect(receivedPayload.variables).toEqual({ name: "Namespace Tester" });
-
-      wsClient.disconnect();
     });
   });
 });
