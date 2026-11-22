@@ -68,14 +68,14 @@ describe("AppModule (e2e)", () => {
   const internalToken = "super-secret-internal-token";
 
   // Access token as issued by variamos_ms_admin (ADR-0001)
-  const userToken = (userId: string) =>
+  const userToken = (userId: string, expiresIn = "15m") =>
     new SignJWT({})
       .setProtectedHeader({ alg: "HS256" })
       .setSubject(userId)
       .setIssuer(ACCESS_TOKEN_ISSUER)
       .setAudience(ACCESS_TOKEN_AUDIENCE)
       .setIssuedAt()
-      .setExpirationTime("15m")
+      .setExpirationTime(expiresIn)
       .sign(deriveAccessTokenKey(internalToken));
   const asUser = async (userId: string) => ({
     Authorization: `Bearer ${await userToken(userId)}`,
@@ -403,5 +403,49 @@ describe("AppModule (e2e)", () => {
       expect(receivedPayload.templateKey).toBe("test_template");
       expect(receivedPayload.variables).toEqual({ name: "Namespace Tester" });
     });
+
+    it("closes a socket when its token expires; the client connects again with a new one (ADM-N19)", async () => {
+      await app.listen(0);
+      const serverUrl = await app.getUrl();
+      let tokensGiven = 0;
+      const wsClient = openSocket(`${serverUrl}/variamos_ms_notifications`, {
+        // As variamos_components: a token asked at each connection
+        auth: (callback) => {
+          tokensGiven += 1;
+          void userToken("user-ws-3", "2s").then((token) =>
+            callback({ token }),
+          );
+        },
+      });
+
+      const connected = nextEvent<void>(wsClient, "connect");
+      wsClient.connect();
+      await connected;
+      const firstId = wsClient.id;
+
+      const closed = nextEvent<string>(wsClient, "disconnect");
+      await expect(closed).resolves.toBe("transport close");
+      await nextEvent<void>(wsClient, "connect");
+
+      expect(tokensGiven).toBe(2);
+      expect(wsClient.id).not.toBe(firstId);
+      // Back in the room of its user
+      const notificationReceived = nextEvent<SocketNotification>(
+        wsClient,
+        "notification",
+      );
+      await request(app.getHttpServer())
+        .post("/notifications")
+        .set("x-internal-token", internalToken)
+        .send({
+          recipients: { userIds: ["user-ws-3"] },
+          templateKey: "test_template",
+          variables: { name: "After expiry" },
+        })
+        .expect(HttpStatus.CREATED);
+      expect((await notificationReceived).variables).toEqual({
+        name: "After expiry",
+      });
+    }, 15_000);
   });
 });

@@ -87,3 +87,38 @@ describe("AccessTokenVerifier", () => {
     await expect(verifier.verify(token)).resolves.toBeNull();
   });
 });
+
+describe("AccessTokenVerifier.verifyAccess (ADM-N19)", () => {
+  const verifier = new AccessTokenVerifier();
+
+  beforeEach(() => {
+    vi.stubEnv("NOTIFICATION_INTERNAL_TOKEN", INTERNAL_TOKEN);
+  });
+
+  it("gives the moment the token expires", async () => {
+    const token = await new SignJWT({})
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject("user-42")
+      .setIssuer(ACCESS_TOKEN_ISSUER)
+      .setAudience(ACCESS_TOKEN_AUDIENCE)
+      .setExpirationTime(2_000_000_000)
+      .sign(deriveAccessTokenKey(INTERNAL_TOKEN));
+
+    await expect(verifier.verifyAccess(token)).resolves.toEqual({
+      userId: "user-42",
+      expiresAt: new Date(2_000_000_000 * 1000),
+    });
+  });
+
+  it("refuses a token that never expires", async () => {
+    const token = await new SignJWT({})
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject("user-42")
+      .setIssuer(ACCESS_TOKEN_ISSUER)
+      .setAudience(ACCESS_TOKEN_AUDIENCE)
+      .sign(deriveAccessTokenKey(INTERNAL_TOKEN));
+
+    await expect(verifier.verifyAccess(token)).resolves.toBeNull();
+    await expect(verifier.verify(token)).resolves.toBeNull();
+  });
+});

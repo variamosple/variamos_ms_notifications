@@ -27,6 +27,12 @@ export function bearerToken(header: unknown): string | null {
   return match?.[1] ?? null;
 }
 
+/** A verified access token: its user, and when it stops being valid. */
+export interface VerifiedAccess {
+  userId: string;
+  expiresAt: Date;
+}
+
 @Injectable()
 export class AccessTokenVerifier {
   private readonly logger = new Logger(AccessTokenVerifier.name);
@@ -38,6 +44,18 @@ export class AccessTokenVerifier {
   public async verify(
     token: string | null | undefined,
   ): Promise<Principal | null> {
+    const access = await this.verifyAccess(token);
+    return access ? { userId: access.userId } : null;
+  }
+
+  /**
+   * The user of a valid access token and the moment it expires: a socket
+   * holds its room until then only (ADM-N19). A token without expiry is
+   * refused, as a missing, expired, forged or foreign one.
+   */
+  public async verifyAccess(
+    token: string | null | undefined,
+  ): Promise<VerifiedAccess | null> {
     if (!token) return null;
     const internalToken = process.env.NOTIFICATION_INTERNAL_TOKEN;
     if (!internalToken) {
@@ -54,10 +72,13 @@ export class AccessTokenVerifier {
           issuer: ACCESS_TOKEN_ISSUER,
           audience: ACCESS_TOKEN_AUDIENCE,
           algorithms: ["HS256"],
+          requiredClaims: ["exp"],
         },
       );
-      return typeof payload.sub === "string" && payload.sub !== ""
-        ? { userId: payload.sub }
+      return typeof payload.sub === "string" &&
+        payload.sub !== "" &&
+        typeof payload.exp === "number"
+        ? { userId: payload.sub, expiresAt: new Date(payload.exp * 1000) }
         : null;
     } catch {
       return null;
