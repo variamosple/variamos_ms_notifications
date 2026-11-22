@@ -9,7 +9,7 @@ import { JsonValue } from "../../../../Domain/Entities/JsonValue.js";
 
 @Entity({ name: "notifications" })
 // Names and indexes as production holds them: the schema builder must find
-// nothing to change (test/migrations.integration-spec.ts)
+// nothing to change (test/migrations.integration.spec.ts)
 @Index("idx_notifications_recipient", ["recipientId"])
 @Index("idx_notifications_template_key", ["templateKey"])
 @Index("idx_notifications_is_read", ["isRead"], { where: "(is_read = false)" })

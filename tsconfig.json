@@ -22,6 +22,6 @@
     "noImplicitReturns": true,
     "noUncheckedIndexedAccess": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["vitest/globals"]
+    "types": ["node"]
   }
 }

@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { describe, expect, it } from "vitest";
 
 // The schema changes only through the versioned migrations (EV-79 lot 1):
 // synchronize drops the columns and indexes it does not know, dropSchema
