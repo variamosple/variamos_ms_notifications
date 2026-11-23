@@ -9,6 +9,7 @@ import { GetInboxUseCase } from "../../UseCases/GetInboxUseCase.js";
 import { ManagePreferencesUseCase } from "../../UseCases/ManagePreferencesUseCase.js";
 import { MarkAllAsReadUseCase } from "../../UseCases/MarkAllAsReadUseCase.js";
 import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
+import { RestoreNotificationUseCase } from "../../UseCases/RestoreNotificationUseCase.js";
 import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
 import { NOTIFICATION_CONTROLLERS } from "../Controllers/notificationControllers.js";
 import {
@@ -38,6 +39,7 @@ const createApp = async (mode: AccessControlMode) => {
       { provide: MarkAllAsReadUseCase, useValue: stub },
       { provide: EmptyTrashUseCase, useValue: stub },
       { provide: DeleteNotificationUseCase, useValue: stub },
+      { provide: RestoreNotificationUseCase, useValue: stub },
       { provide: ManagePreferencesUseCase, useValue: stub },
       { provide: AccessTokenVerifier, useValue: verifier },
       { provide: ACCESS_CONTROL_MODE_TOKEN, useValue: mode },

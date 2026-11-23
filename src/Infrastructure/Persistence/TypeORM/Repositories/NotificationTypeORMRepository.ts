@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { IsNull, Not, ObjectLiteral, Repository } from "typeorm";
+import { IsNull, LessThan, Not, ObjectLiteral, Repository } from "typeorm";
 import { Notification } from "../../../../Domain/Entities/Notification.js";
 import { requireRecipient } from "../../../../Domain/Errors/NotificationErrors.js";
 import { INotificationRepository } from "../../../../Domain/Repositories/INotificationRepository.js";
@@ -130,5 +130,12 @@ export class NotificationTypeORMRepository implements INotificationRepository {
       recipientId,
       deletedAt: Not(IsNull()),
     });
+  }
+
+  public async purgeTrashedBefore(cutoff: Date): Promise<number> {
+    const result = await this.repository.delete({
+      deletedAt: LessThan(cutoff),
+    });
+    return result.affected ?? 0;
   }
 }

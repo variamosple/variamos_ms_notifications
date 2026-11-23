@@ -19,6 +19,7 @@ import { GetInboxUseCase } from "../../UseCases/GetInboxUseCase.js";
 import { ManagePreferencesUseCase } from "../../UseCases/ManagePreferencesUseCase.js";
 import { MarkAllAsReadUseCase } from "../../UseCases/MarkAllAsReadUseCase.js";
 import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
+import { RestoreNotificationUseCase } from "../../UseCases/RestoreNotificationUseCase.js";
 import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
 import { NOTIFICATION_CONTROLLERS } from "./notificationControllers.js";
 
@@ -64,6 +65,7 @@ const useCases = {
   markAllAsRead: { execute: vi.fn() },
   emptyTrash: { execute: vi.fn() },
   delete: { execute: vi.fn() },
+  restore: { execute: vi.fn() },
   preferences: { get: vi.fn(), update: vi.fn() },
 };
 
@@ -84,6 +86,7 @@ describe("NotificationController HTTP contract", () => {
         { provide: MarkAllAsReadUseCase, useValue: useCases.markAllAsRead },
         { provide: EmptyTrashUseCase, useValue: useCases.emptyTrash },
         { provide: DeleteNotificationUseCase, useValue: useCases.delete },
+        { provide: RestoreNotificationUseCase, useValue: useCases.restore },
         { provide: ManagePreferencesUseCase, useValue: useCases.preferences },
       ],
     }).compile();
@@ -352,6 +355,27 @@ describe("NotificationController HTTP contract", () => {
       );
 
       expect(useCases.delete.execute).toHaveBeenCalledWith(N1, undefined);
+    });
+  });
+
+  describe("PATCH /notifications/:id/restore", () => {
+    it("answers the notification taken out of the trash", async () => {
+      useCases.restore.execute.mockResolvedValue(readNotification());
+
+      const response = await asUser(
+        http().patch(`/notifications/${N1}/restore`),
+      ).expect(HttpStatus.OK);
+
+      expect(useCases.restore.execute).toHaveBeenCalledWith(N1, undefined);
+      expect(response.body).toEqual(READ_NOTIFICATION_BODY);
+    });
+
+    it("answers 400 for an id that is not a UUID", async () => {
+      await asUser(http().patch("/notifications/not-a-uuid/restore")).expect(
+        HttpStatus.BAD_REQUEST,
+      );
+
+      expect(useCases.restore.execute).not.toHaveBeenCalled();
     });
   });
 

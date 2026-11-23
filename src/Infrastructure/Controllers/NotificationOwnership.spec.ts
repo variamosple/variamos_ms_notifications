@@ -21,6 +21,7 @@ import { GetInboxUseCase } from "../../UseCases/GetInboxUseCase.js";
 import { ManagePreferencesUseCase } from "../../UseCases/ManagePreferencesUseCase.js";
 import { MarkAllAsReadUseCase } from "../../UseCases/MarkAllAsReadUseCase.js";
 import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
+import { RestoreNotificationUseCase } from "../../UseCases/RestoreNotificationUseCase.js";
 import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
 import { ACCESS_CONTROL_MODE_TOKEN } from "../Auth/AccessControlMode.js";
 import { AccessTokenVerifier } from "../Auth/AccessTokenVerifier.js";
@@ -62,6 +63,13 @@ class InMemoryNotifications implements INotificationRepository {
     for (const n of notifications) {
       if (n.deletedAt) this.rows.delete(n.id);
     }
+  }
+  public async purgeTrashedBefore(cutoff: Date) {
+    const old = [...this.rows.values()].filter(
+      (n) => n.deletedAt && n.deletedAt < cutoff,
+    );
+    for (const n of old) this.rows.delete(n.id);
+    return old.length;
   }
 }
 
@@ -139,6 +147,10 @@ describe("Notification ownership with an access token", () => {
           useValue: new DeleteNotificationUseCase(notifications),
         },
         {
+          provide: RestoreNotificationUseCase,
+          useValue: new RestoreNotificationUseCase(notifications),
+        },
+        {
           provide: ManagePreferencesUseCase,
           useValue: new ManagePreferencesUseCase(preferences),
         },
@@ -195,6 +207,27 @@ describe("Notification ownership with an access token", () => {
     );
 
     expect(notifications.rows.get(B1)?.deletedAt).toBeNull();
+  });
+
+  it("restores the token user's own notification from the trash", async () => {
+    notifications.rows.get(A1)?.moveToTrash();
+
+    const response = await asUserA(
+      http().patch(`/notifications/${A1}/restore`),
+    ).expect(HttpStatus.OK);
+
+    expect(response.body).toMatchObject({ id: A1, deletedAt: null });
+    expect(notifications.rows.get(A1)?.deletedAt).toBeNull();
+  });
+
+  it("answers 404 when restoring another user's notification", async () => {
+    notifications.rows.get(B1)?.moveToTrash();
+
+    await asUserA(http().patch(`/notifications/${B1}/restore`)).expect(
+      HttpStatus.NOT_FOUND,
+    );
+
+    expect(notifications.rows.get(B1)?.deletedAt).not.toBeNull();
   });
 
   it("answers 404, not 500, for a notification that does not exist", async () => {

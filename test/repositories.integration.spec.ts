@@ -374,6 +374,58 @@ describe("Repositories (Integration)", () => {
       expect(trashAfter).toHaveLength(0);
     });
 
+    it("purges, for every user, only what was trashed before the date", async () => {
+      const at = (id: string, recipientId: string, trashTime: Date | null) =>
+        new Notification({
+          id,
+          recipientId,
+          actorId: null,
+          templateKey: "key-1",
+          variables: {},
+          metadata: {},
+          read: true,
+          readTime: null,
+          createdAt: new Date("2026-09-01T10:00:00Z"),
+          trashTime,
+        });
+      await notificationRepo.saveMany([
+        at(
+          "70000000-0000-4000-8000-000000000001",
+          "user-1",
+          new Date("2026-10-01T10:00:00Z"),
+        ),
+        at(
+          "70000000-0000-4000-8000-000000000002",
+          "user-2",
+          new Date("2026-10-02T10:00:00Z"),
+        ),
+        at(
+          "70000000-0000-4000-8000-000000000003",
+          "user-1",
+          new Date("2026-11-20T10:00:00Z"),
+        ),
+        at("70000000-0000-4000-8000-000000000004", "user-2", null),
+      ]);
+
+      const deleted = await notificationRepo.purgeTrashedBefore(
+        new Date("2026-10-24T12:00:00Z"),
+      );
+
+      expect(deleted).toBe(2);
+      expect(
+        await notificationRepo.findById("70000000-0000-4000-8000-000000000001"),
+      ).toBeNull();
+      expect(
+        await notificationRepo.findById("70000000-0000-4000-8000-000000000002"),
+      ).toBeNull();
+      expect(
+        await notificationRepo.findById("70000000-0000-4000-8000-000000000003"),
+      ).not.toBeNull();
+      expect(
+        await notificationRepo.findById("70000000-0000-4000-8000-000000000004"),
+      ).not.toBeNull();
+    });
+
     it("saves the trash date of a notification moved to the trash", async () => {
       const notif = new Notification({
         id: "60000000-1234-5678-9012-36689f94b8cf",

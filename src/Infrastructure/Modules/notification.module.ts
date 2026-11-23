@@ -12,6 +12,8 @@ import { GetInboxUseCase } from "../../UseCases/GetInboxUseCase.js";
 import { ManagePreferencesUseCase } from "../../UseCases/ManagePreferencesUseCase.js";
 import { MarkAllAsReadUseCase } from "../../UseCases/MarkAllAsReadUseCase.js";
 import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
+import { PurgeTrashUseCase } from "../../UseCases/PurgeTrashUseCase.js";
+import { RestoreNotificationUseCase } from "../../UseCases/RestoreNotificationUseCase.js";
 import {
   type SendNotificationStores,
   SendNotificationUseCase,
@@ -27,6 +29,11 @@ import {
   UserAwareThrottlerGuard,
 } from "../Auth/UserAwareThrottlerGuard.js";
 import { NOTIFICATION_CONTROLLERS } from "../Controllers/notificationControllers.js";
+import {
+  TRASH_PURGE_SCHEDULE,
+  TRASH_PURGE_SCHEDULE_TOKEN,
+  TrashPurgeJob,
+} from "../Jobs/TrashPurgeJob.js";
 import { DatabaseModule } from "../Persistence/TypeORM/database.module.js";
 import { UserServiceHttpClient } from "../Services/UserServiceHttpClient.js";
 import {
@@ -113,6 +120,20 @@ import {
         new MarkAllAsReadUseCase(notificationRepo),
       inject: [NOTIFICATION_REPOSITORY],
     },
+    {
+      provide: RestoreNotificationUseCase,
+      useFactory: (notificationRepo: INotificationRepository) =>
+        new RestoreNotificationUseCase(notificationRepo),
+      inject: [NOTIFICATION_REPOSITORY],
+    },
+    {
+      provide: PurgeTrashUseCase,
+      useFactory: (notificationRepo: INotificationRepository) =>
+        new PurgeTrashUseCase(notificationRepo),
+      inject: [NOTIFICATION_REPOSITORY],
+    },
+    { provide: TRASH_PURGE_SCHEDULE_TOKEN, useValue: TRASH_PURGE_SCHEDULE },
+    TrashPurgeJob,
     {
       provide: EmptyTrashUseCase,
       useFactory: (notificationRepo: INotificationRepository) =>
