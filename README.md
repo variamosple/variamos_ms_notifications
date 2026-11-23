@@ -94,9 +94,19 @@ All routes are prefixed with `/notifications`.
 *   **PATCH** `/read-all?recipientId=<user-uuid>`
 *   **Response:** `204 No Content`
 
+### Move a notification to the trash
+*   **DELETE** `/:id`
+*   **Response:** `204 No Content`
+
+### Restore a notification from the trash
+*   **PATCH** `/:id/restore`
+*   **Response:** `200 OK` with the notification, back in the inbox
+
 ### Empty trash
 *   **DELETE** `/trash?recipientId=<user-uuid>`
 *   **Response:** `204 No Content`
+
+The notifications kept in the trash for more than 30 days are deleted once a day, for every user (`TrashPurgeJob`, first run one minute after the start).
 
 ### Get preferences
 *   **GET** `/preferences?recipientId=<user-uuid>`

@@ -16,4 +16,7 @@ export interface INotificationRepository {
   countUnread(recipientId: string): Promise<number>;
   markAllAsRead(recipientId: string): Promise<void>;
   emptyTrash(recipientId: string): Promise<void>;
+  // Deletes, for every user, the notifications moved to the trash before
+  // the date; returns how many (ADM-N16)
+  purgeTrashedBefore(cutoff: Date): Promise<number>;
 }
