@@ -1,8 +1,1 @@
-[
-  {
-    "id": "GHSA-fc5q-39xc-vjpf",
-    "package": "picomatch",
-    "reason": "No patched version exists (4.0.7 is the latest and is affected). The ReDoS needs an attacker-supplied glob pattern; here picomatch only receives patterns written in the code: TypeORM loads its entities with a fixed pattern from the configuration at run time, and the development tools read their own configuration. Remove once a patched picomatch is released.",
-    "expires": "2026-12-02"
-  }
-]
+[]
