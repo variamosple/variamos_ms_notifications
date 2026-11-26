@@ -53,6 +53,8 @@ The service answers on `http://localhost:8090/variamos_ms_notifications/`. The k
 
 All routes are prefixed with `/notifications`.
 
+**User routes** (every route below except the internal send) take the access token that `variamos_ms_admin` issues to a signed-in user (`GET /v1/notifications/access-token`), in `Authorization: Bearer <token>`. Without a valid token they answer `401`. They always act on the user of the token: no route takes a user id. A `recipientId` or `userId` that an older client still sends in the query is ignored, not refused. A notification of another user answers `404`, as one that does not exist.
+
 ### 1. Send a notification (internal call)
 *   **POST** `/`
 *   **Headers:** `x-internal-token: <NOTIFICATION_INTERNAL_TOKEN>`
@@ -81,7 +83,6 @@ All routes are prefixed with `/notifications`.
 ### Get notifications
 *   **GET** `/`
 *   **Query params:**
-    *   `recipientId` (required): User UUID
     *   `folder` (optional): `"inbox"` (default) or `"trash"`
     *   `page` (optional): default `1`
     *   `limit` (optional): default `10`
@@ -91,7 +92,7 @@ All routes are prefixed with `/notifications`.
 *   **Response:** `200 OK`
 
 ### Mark all as read
-*   **PATCH** `/read-all?recipientId=<user-uuid>`
+*   **PATCH** `/read-all`
 *   **Response:** `204 No Content`
 
 ### Move a notification to the trash
@@ -103,16 +104,16 @@ All routes are prefixed with `/notifications`.
 *   **Response:** `200 OK` with the notification, back in the inbox
 
 ### Empty trash
-*   **DELETE** `/trash?recipientId=<user-uuid>`
+*   **DELETE** `/trash`
 *   **Response:** `204 No Content`
 
 The notifications kept in the trash for more than 30 days are deleted once a day, for every user (`TrashPurgeJob`, first run one minute after the start).
 
 ### Get preferences
-*   **GET** `/preferences?recipientId=<user-uuid>`
+*   **GET** `/preferences`
 
 ### Update preferences
-*   **PATCH** `/preferences?recipientId=<user-uuid>`
+*   **PATCH** `/preferences`
 *   **Body (JSON):**
     ```json
     {
@@ -129,7 +130,7 @@ The notifications kept in the trash for more than 30 days are deleted once a day
 Clients connect using Socket.io to receive real-time notifications.
 
 *   **URL:** `ws://localhost:3000`, on the namespace `/` or `/variamos_ms_notifications` (a notification is sent once on each).
-*   **Handshake:** pass the access token issued by `variamos_ms_admin` in `auth.token`. The client joins the room of the user of the token; a user id sent by the client is ignored. Without a valid token the connection is refused (the service runs in "enforce" mode, `src/Infrastructure/Auth/AccessControlMode.ts`).
+*   **Handshake:** pass the access token issued by `variamos_ms_admin` in `auth.token`. The client joins the room of the user of the token; a `userId` sent by the client, in `auth` or in the query, is never read. Without a valid token the connection is refused. When the token expires, the connection is closed, and socket.io connects again with a new token.
     ```javascript
     import { io } from "socket.io-client";
     const socket = io("http://localhost:3000", {

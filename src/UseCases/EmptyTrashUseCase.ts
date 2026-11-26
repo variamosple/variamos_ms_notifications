@@ -4,7 +4,8 @@ import { INotificationRepository } from "../Domain/Repositories/INotificationRep
 export class EmptyTrashUseCase {
   constructor(private readonly notificationRepo: INotificationRepository) {}
 
-  public async execute(recipientId: string | undefined): Promise<void> {
+  // The user of the access token; an empty one is still refused (CA-NT-01)
+  public async execute(recipientId: string): Promise<void> {
     await this.notificationRepo.emptyTrash(requireRecipient(recipientId));
   }
 }

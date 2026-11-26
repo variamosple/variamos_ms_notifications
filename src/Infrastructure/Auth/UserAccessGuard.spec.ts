@@ -1,4 +1,4 @@
-import { HttpStatus, type INestApplication, Logger } from "@nestjs/common";
+import { HttpStatus, type INestApplication } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
@@ -12,11 +12,6 @@ import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
 import { RestoreNotificationUseCase } from "../../UseCases/RestoreNotificationUseCase.js";
 import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
 import { NOTIFICATION_CONTROLLERS } from "../Controllers/notificationControllers.js";
-import {
-  ACCESS_CONTROL_MODE,
-  ACCESS_CONTROL_MODE_TOKEN,
-  type AccessControlMode,
-} from "./AccessControlMode.js";
 import { AccessTokenVerifier } from "./AccessTokenVerifier.js";
 import { UserAccessGuard } from "./UserAccessGuard.js";
 
@@ -28,7 +23,7 @@ const verifier = {
   ),
 };
 
-const createApp = async (mode: AccessControlMode) => {
+const createApp = async () => {
   const stub = { execute: vi.fn(), get: vi.fn(), update: vi.fn() };
   const moduleRef = await Test.createTestingModule({
     controllers: NOTIFICATION_CONTROLLERS,
@@ -42,7 +37,6 @@ const createApp = async (mode: AccessControlMode) => {
       { provide: RestoreNotificationUseCase, useValue: stub },
       { provide: ManagePreferencesUseCase, useValue: stub },
       { provide: AccessTokenVerifier, useValue: verifier },
-      { provide: ACCESS_CONTROL_MODE_TOKEN, useValue: mode },
       { provide: APP_GUARD, useClass: UserAccessGuard },
     ],
   }).compile();
@@ -63,79 +57,46 @@ describe("UserAccessGuard", () => {
     vi.restoreAllMocks();
   });
 
-  it("enforces access tokens now that clients send them", () => {
-    expect(ACCESS_CONTROL_MODE).toBe("enforce");
-  });
+  it("refuses a request without token, even when it names a recipient", async () => {
+    app = await createApp();
 
-  describe("observe mode", () => {
-    it("lets a request without token through and logs it", async () => {
-      const warn = vi
-        .spyOn(Logger.prototype, "warn")
-        .mockImplementation(() => {});
-      app = await createApp("observe");
-
+    for (const query of ["", "?recipientId=user-1", "?userId=user-1"]) {
       await request(app.getHttpServer())
-        .get("/notifications?recipientId=user-1")
-        .expect(HttpStatus.OK);
-
-      expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining("Observe mode: GET /notifications"),
-      );
-      expect(JSON.stringify(warn.mock.calls)).not.toContain("user-1");
-    });
-
-    it("does not log a request with a valid token", async () => {
-      const warn = vi
-        .spyOn(Logger.prototype, "warn")
-        .mockImplementation(() => {});
-      app = await createApp("observe");
-
-      await request(app.getHttpServer())
-        .get("/notifications?recipientId=user-42")
-        .set("Authorization", "Bearer valid-token")
-        .expect(HttpStatus.OK);
-
-      expect(warn).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("enforce mode", () => {
-    it("refuses a request without token", async () => {
-      app = await createApp("enforce");
-
-      await request(app.getHttpServer())
-        .get("/notifications?recipientId=user-1")
+        .get(`/notifications${query}`)
         .expect(HttpStatus.UNAUTHORIZED);
-      expect(inbox.execute).not.toHaveBeenCalled();
-    });
+    }
+    expect(inbox.execute).not.toHaveBeenCalled();
+  });
 
-    it("refuses a forged token", async () => {
-      app = await createApp("enforce");
+  it("refuses a forged token", async () => {
+    app = await createApp();
 
-      const response = await request(app.getHttpServer())
-        .get("/notifications")
-        .set("Authorization", "Bearer forged-token");
-      expect(response.status).toBe(HttpStatus.UNAUTHORIZED);
-    });
+    const response = await request(app.getHttpServer())
+      .get("/notifications")
+      .set("Authorization", "Bearer forged-token");
+    expect(response.status).toBe(HttpStatus.UNAUTHORIZED);
+  });
 
-    it("accepts a valid token", async () => {
-      app = await createApp("enforce");
+  it("accepts a valid token, and reads the inbox of its user only", async () => {
+    app = await createApp();
 
-      const response = await request(app.getHttpServer())
-        .get("/notifications?recipientId=user-42")
-        .set("Authorization", "Bearer valid-token");
-      expect(response.status).toBe(HttpStatus.OK);
-    });
+    const response = await request(app.getHttpServer())
+      .get("/notifications?recipientId=user-1")
+      .set("Authorization", "Bearer valid-token");
+    expect(response.status).toBe(HttpStatus.OK);
+    expect(inbox.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientId: "user-42" }),
+    );
+  });
 
-    it("keeps the internal route on the internal token only", async () => {
-      vi.stubEnv("NOTIFICATION_INTERNAL_TOKEN", "internal");
-      app = await createApp("enforce");
+  it("keeps the internal route on the internal token only", async () => {
+    vi.stubEnv("NOTIFICATION_INTERNAL_TOKEN", "internal");
+    app = await createApp();
 
-      const response = await request(app.getHttpServer())
-        .post("/notifications")
-        .set("x-internal-token", "internal")
-        .send({ recipients: { userIds: ["u"] }, templateKey: "welcome" });
-      expect(response.status).toBe(HttpStatus.CREATED);
-    });
+    const response = await request(app.getHttpServer())
+      .post("/notifications")
+      .set("x-internal-token", "internal")
+      .send({ recipients: { userIds: ["u"] }, templateKey: "welcome" });
+    expect(response.status).toBe(HttpStatus.CREATED);
   });
 });

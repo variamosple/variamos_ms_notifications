@@ -23,15 +23,15 @@ import { MarkAllAsReadUseCase } from "../../UseCases/MarkAllAsReadUseCase.js";
 import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
 import { RestoreNotificationUseCase } from "../../UseCases/RestoreNotificationUseCase.js";
 import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
-import { ACCESS_CONTROL_MODE_TOKEN } from "../Auth/AccessControlMode.js";
 import { AccessTokenVerifier } from "../Auth/AccessTokenVerifier.js";
 import { UserAccessGuard } from "../Auth/UserAccessGuard.js";
 import { NOTIFICATION_CONTROLLERS } from "./notificationControllers.js";
 
 /**
- * Ownership (EV-68 lot 2, CA-NT-01, CA-NT-03): with a valid access token,
- * a user only reads and changes its own notifications and preferences,
- * whatever recipientId the query names. Real use cases, in-memory data.
+ * Ownership (EV-68 lot 2, CA-NT-01, CA-NT-03, TRV-66): with a valid access
+ * token, a user only reads and changes its own notifications and
+ * preferences, whatever recipientId the query names; without one, nothing
+ * is served or changed. Real use cases, in-memory data.
  */
 class InMemoryNotifications implements INotificationRepository {
   public rows = new Map<string, Notification>();
@@ -155,7 +155,6 @@ describe("Notification ownership with an access token", () => {
           useValue: new ManagePreferencesUseCase(preferences),
         },
         { provide: AccessTokenVerifier, useValue: verifier },
-        { provide: ACCESS_CONTROL_MODE_TOKEN, useValue: "observe" },
         { provide: APP_GUARD, useClass: UserAccessGuard },
       ],
     }).compile();
@@ -258,34 +257,60 @@ describe("Notification ownership with an access token", () => {
     expect(preferences.rows.has("user-b")).toBe(false);
   });
 
-  describe("without a token (observe mode)", () => {
-    it("still serves the recipient of the query", async () => {
-      const response = await http()
-        .get("/notifications?recipientId=user-b")
-        .expect(HttpStatus.OK);
+  it("empties only the token user's trash", async () => {
+    notifications.rows.get(A1)?.moveToTrash();
+    notifications.rows.get(B1)?.moveToTrash();
 
-      expect(response.body.map((n: { id: string }) => n.id)).toEqual([B1]);
+    await asUserA(
+      http().delete("/notifications/trash?recipientId=user-b"),
+    ).expect(HttpStatus.NO_CONTENT);
+
+    expect(notifications.rows.has(A1)).toBe(false);
+    expect(notifications.rows.has(B1)).toBe(true);
+  });
+
+  it("reads only the token user's preferences", async () => {
+    preferences.rows.set("user-b", UserPreferences.defaultsFor("user-b"));
+    preferences.rows.get("user-b")?.disableEmail();
+
+    const response = await asUserA(
+      http().get("/notifications/preferences?recipientId=user-b"),
+    ).expect(HttpStatus.OK);
+
+    expect(response.body).toMatchObject({
+      userId: "user-a",
+      emailEnabled: true,
     });
+  });
 
+  describe("without a token", () => {
     it.each([
-      ["GET", "/notifications"],
-      ["PATCH", "/notifications/read-all"],
-      ["DELETE", "/notifications/trash"],
-      ["GET", "/notifications/preferences"],
+      ["GET", "/notifications?recipientId=user-b"],
+      ["GET", "/notifications?userId=user-b"],
+      ["PATCH", "/notifications/read-all?recipientId=user-b"],
+      ["DELETE", "/notifications/trash?recipientId=user-b"],
+      ["GET", "/notifications/preferences?recipientId=user-b"],
+      ["PATCH", "/notifications/preferences?recipientId=user-b"],
+      ["PATCH", `/notifications/${B1}/read`],
+      ["DELETE", `/notifications/${B1}`],
+      ["PATCH", `/notifications/${B1}/restore`],
     ] as const)(
-      "answers 400 for %s %s without any recipient",
+      "answers 401 to %s %s and changes nothing",
       async (method, url) => {
         const send = {
           GET: () => http().get(url),
-          PATCH: () => http().patch(url),
+          PATCH: () => http().patch(url).send({ emailEnabled: false }),
           DELETE: () => http().delete(url),
         }[method];
-        const pending = send();
 
-        const response = await pending.expect(HttpStatus.BAD_REQUEST);
-        expect(response.body.errorCode).toBe("MISSING_RECIPIENT");
-        expect(notifications.rows.get(A1)?.isRead).toBe(false);
-        expect(notifications.rows.get(B1)?.isRead).toBe(false);
+        const response = await send().expect(HttpStatus.UNAUTHORIZED);
+
+        expect(JSON.stringify(response.body)).not.toContain(B1);
+        expect(notifications.rows.get(B1)).toMatchObject({
+          isRead: false,
+          deletedAt: null,
+        });
+        expect(preferences.rows.has("user-b")).toBe(false);
       },
     );
   });

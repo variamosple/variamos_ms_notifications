@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -10,51 +10,22 @@ import { Server, Socket } from "socket.io";
 import { Notification } from "../../Domain/Entities/Notification.js";
 import { INotificationChannel } from "../../Domain/Services/INotificationChannel.js";
 import {
-  ACCESS_CONTROL_MODE_TOKEN,
-  type AccessControlMode,
-} from "../Auth/AccessControlMode.js";
-import { AccessTokenVerifier } from "../Auth/AccessTokenVerifier.js";
+  AccessTokenVerifier,
+  type VerifiedAccess,
+} from "../Auth/AccessTokenVerifier.js";
 import { ALLOWED_ORIGINS } from "../Config/allowedOrigins.js";
 
-function extractUserId(client: Socket): string | null {
-  let raw = client.handshake.auth?.userId || client.handshake.query?.userId;
-  if (Array.isArray(raw)) {
-    raw = raw[0];
-  }
-  return typeof raw === "string" && raw.trim() !== "" ? raw.trim() : null;
-}
-
-/** The room a connecting client joins, and until when it may stay there. */
-interface RoomAccess {
-  userId: string;
-  /** Absent in observe mode, where the client gives its own userId. */
-  expiresAt?: Date;
-}
-
 /**
- * Room to join for a connecting client: the user of a valid access token
- * (`handshake.auth.token`). Without one, "observe" mode keeps the userId the
- * client gives, and "enforce" mode refuses the connection (null).
+ * The room of a connecting client: the user of its access token
+ * (`handshake.auth.token`), or null without a valid one. A `userId` that
+ * the client gives, in `auth` or in the query, is never read (TRV-66).
  */
-async function resolveRoom(
+function resolveRoom(
   client: Socket,
   verifier: AccessTokenVerifier,
-  mode: AccessControlMode,
-  logger: Logger,
-): Promise<RoomAccess | null> {
+): Promise<VerifiedAccess | null> {
   const token = client.handshake.auth?.token;
-  const access = await verifier.verifyAccess(
-    typeof token === "string" ? token : null,
-  );
-  if (access) return access;
-  if (mode === "enforce") return null;
-  const userId = extractUserId(client);
-  if (userId) {
-    logger.warn(
-      `Observe mode: socket ${client.id} connected without a valid access token`,
-    );
-  }
-  return userId ? { userId } : null;
+  return verifier.verifyAccess(typeof token === "string" ? token : null);
 }
 
 // setTimeout takes at most 2^31 - 1 ms (about 24 days)
@@ -78,10 +49,10 @@ abstract class UserRoomGateway
   /** The end of the access token of each open socket, by socket id. */
   private readonly expiries = new Map<string, NodeJS.Timeout>();
 
-  protected constructor(
-    private readonly verifier: AccessTokenVerifier,
-    private readonly mode: AccessControlMode,
-  ) {}
+  /** The verified user of each open socket, for the disconnection log. */
+  private readonly users = new Map<string, string>();
+
+  protected constructor(private readonly verifier: AccessTokenVerifier) {}
 
   public afterInit(_server: Server): void {
     this.logger.log(
@@ -95,12 +66,7 @@ abstract class UserRoomGateway
   }
 
   public async handleConnection(client: Socket): Promise<void> {
-    const access = await resolveRoom(
-      client,
-      this.verifier,
-      this.mode,
-      this.logger,
-    );
+    const access = await resolveRoom(client, this.verifier);
     if (!access) {
       this.logger.warn(
         `Rejected socket connection on ${this.label} without a valid user: ${client.id}`,
@@ -110,8 +76,9 @@ abstract class UserRoomGateway
     }
 
     const { userId, expiresAt } = access;
+    this.users.set(client.id, userId);
     await client.join(userId);
-    if (expiresAt) this.closeAtExpiry(client, expiresAt);
+    this.closeAtExpiry(client, expiresAt);
     this.logger.log(
       `[${this.label}] User connected: userId=${userId}, socketId=${client.id}`,
     );
@@ -143,7 +110,8 @@ abstract class UserRoomGateway
   public handleDisconnect(client: Socket): void {
     clearTimeout(this.expiries.get(client.id));
     this.expiries.delete(client.id);
-    const userId = extractUserId(client);
+    const userId = this.users.get(client.id);
+    this.users.delete(client.id);
     if (userId) {
       this.logger.log(
         `[${this.label}] User disconnected: userId=${userId}, socketId=${client.id}`,
@@ -162,12 +130,8 @@ export class RootNotificationGateway extends UserRoomGateway {
   protected readonly label = "/";
   protected readonly logger = new Logger(RootNotificationGateway.name);
 
-  constructor(
-    verifier: AccessTokenVerifier,
-    @Inject(ACCESS_CONTROL_MODE_TOKEN)
-    mode: AccessControlMode,
-  ) {
-    super(verifier, mode);
+  constructor(verifier: AccessTokenVerifier) {
+    super(verifier);
   }
 }
 
@@ -192,10 +156,8 @@ export class NotificationGateway
   constructor(
     private readonly rootGateway: RootNotificationGateway,
     verifier: AccessTokenVerifier,
-    @Inject(ACCESS_CONTROL_MODE_TOKEN)
-    mode: AccessControlMode,
   ) {
-    super(verifier, mode);
+    super(verifier);
   }
 
   public send(notification: Notification): Promise<void> {

@@ -3,8 +3,8 @@ import { requireRecipient } from "../Domain/Errors/NotificationErrors.js";
 import { INotificationRepository } from "../Domain/Repositories/INotificationRepository.js";
 
 export interface GetInboxInput {
-  // Refused when missing, as an absent query parameter gives undefined
-  recipientId: string | undefined;
+  // The user of the access token; an empty one is still refused (CA-NT-01)
+  recipientId: string;
   page: number;
   limit: number;
   folder: "inbox" | "trash";

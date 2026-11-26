@@ -6,12 +6,12 @@ export class DeleteNotificationUseCase {
   constructor(private readonly notificationRepo: INotificationRepository) {}
 
   /**
-   * With an actor, only the actor's own notification can be deleted; any
-   * other one answers "not found".
+   * Only the actor's own notification can be deleted; any other one answers
+   * "not found", so that its existence is not told.
    */
-  public async execute(id: string, actor?: Principal): Promise<void> {
+  public async execute(id: string, actor: Principal): Promise<void> {
     const notification = await this.notificationRepo.findById(id);
-    if (!notification || (actor && !notification.belongsTo(actor.userId))) {
+    if (!notification?.belongsTo(actor.userId)) {
       throw new NotificationNotFoundError(id);
     }
     notification.moveToTrash();
