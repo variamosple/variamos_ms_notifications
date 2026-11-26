@@ -11,7 +11,7 @@ export interface UpdatePreferencesInput {
 export class ManagePreferencesUseCase {
   constructor(private readonly preferencesRepo: IUserPreferencesRepository) {}
 
-  public async get(userId: string | undefined): Promise<UserPreferences> {
+  public async get(userId: string): Promise<UserPreferences> {
     const recipientId = requireRecipient(userId);
     const preferences = await this.preferencesRepo.findByUserId(recipientId);
     if (!preferences) {
@@ -21,7 +21,7 @@ export class ManagePreferencesUseCase {
   }
 
   public async update(
-    userId: string | undefined,
+    userId: string,
     input: UpdatePreferencesInput,
   ): Promise<UserPreferences> {
     const recipientId = requireRecipient(userId);

@@ -1,4 +1,5 @@
 import { HttpStatus, type INestApplication, Logger } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import {
@@ -21,12 +22,15 @@ import { MarkAllAsReadUseCase } from "../../UseCases/MarkAllAsReadUseCase.js";
 import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
 import { RestoreNotificationUseCase } from "../../UseCases/RestoreNotificationUseCase.js";
 import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
+import { AccessTokenVerifier } from "../Auth/AccessTokenVerifier.js";
+import { UserAccessGuard } from "../Auth/UserAccessGuard.js";
 import { NOTIFICATION_CONTROLLERS } from "./notificationControllers.js";
 
 /**
- * Characterization tests (EV-110 lot 1): they pin the current HTTP contract
- * of every route before access control is added (EV-68). Requests go through
- * `asUser`, so adding a user token later changes one place only.
+ * The HTTP contract of every route (EV-110 lot 1, EV-68). The user routes
+ * go through `asUser`, with the access token of user-1: the recipient is
+ * that user, and the old `recipientId` parameter that some calls still send
+ * is ignored, not refused (TRV-66).
  */
 const INTERNAL_TOKEN = "test-internal-token";
 const N1 = "11111111-1111-4111-8111-111111111111";
@@ -73,8 +77,8 @@ describe("NotificationController HTTP contract", () => {
   let app: INestApplication;
 
   const http = () => request(app.getHttpServer());
-  // Today the user routes need no credentials; EV-68 adds the user token here
-  const asUser = (pending: request.Test) => pending;
+  const asUser = (pending: request.Test) =>
+    pending.set("Authorization", "Bearer token-of-user-1");
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -88,6 +92,14 @@ describe("NotificationController HTTP contract", () => {
         { provide: DeleteNotificationUseCase, useValue: useCases.delete },
         { provide: RestoreNotificationUseCase, useValue: useCases.restore },
         { provide: ManagePreferencesUseCase, useValue: useCases.preferences },
+        {
+          provide: AccessTokenVerifier,
+          useValue: {
+            verify: async (token: string | null) =>
+              token === "token-of-user-1" ? { userId: "user-1" } : null,
+          },
+        },
+        { provide: APP_GUARD, useClass: UserAccessGuard },
       ],
     }).compile();
     app = moduleRef.createNestApplication();
@@ -306,7 +318,9 @@ describe("NotificationController HTTP contract", () => {
       ).expect(HttpStatus.OK);
 
       expect(response.body).toEqual(READ_NOTIFICATION_BODY);
-      expect(useCases.markAsRead.execute).toHaveBeenCalledWith(N1, undefined);
+      expect(useCases.markAsRead.execute).toHaveBeenCalledWith(N1, {
+        userId: "user-1",
+      });
     });
   });
 
@@ -354,7 +368,9 @@ describe("NotificationController HTTP contract", () => {
         HttpStatus.NO_CONTENT,
       );
 
-      expect(useCases.delete.execute).toHaveBeenCalledWith(N1, undefined);
+      expect(useCases.delete.execute).toHaveBeenCalledWith(N1, {
+        userId: "user-1",
+      });
     });
   });
 
@@ -366,7 +382,9 @@ describe("NotificationController HTTP contract", () => {
         http().patch(`/notifications/${N1}/restore`),
       ).expect(HttpStatus.OK);
 
-      expect(useCases.restore.execute).toHaveBeenCalledWith(N1, undefined);
+      expect(useCases.restore.execute).toHaveBeenCalledWith(N1, {
+        userId: "user-1",
+      });
       expect(response.body).toEqual(READ_NOTIFICATION_BODY);
     });
 

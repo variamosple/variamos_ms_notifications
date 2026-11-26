@@ -49,8 +49,8 @@ describe("RestoreNotificationUseCase", () => {
   it("answers not found for a notification that does not exist", async () => {
     notificationRepo.findById.mockResolvedValue(null);
 
-    await expect(useCase.execute("missing")).rejects.toThrow(
-      "Notification with ID 'missing' not found",
-    );
+    await expect(
+      useCase.execute("missing", { userId: "user-1" }),
+    ).rejects.toThrow("Notification with ID 'missing' not found");
   });
 });

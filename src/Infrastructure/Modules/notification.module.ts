@@ -18,10 +18,6 @@ import {
   type SendNotificationStores,
   SendNotificationUseCase,
 } from "../../UseCases/SendNotificationUseCase.js";
-import {
-  ACCESS_CONTROL_MODE,
-  ACCESS_CONTROL_MODE_TOKEN,
-} from "../Auth/AccessControlMode.js";
 import { AccessTokenVerifier } from "../Auth/AccessTokenVerifier.js";
 import { UserAccessGuard } from "../Auth/UserAccessGuard.js";
 import {
@@ -54,7 +50,6 @@ import {
   controllers: NOTIFICATION_CONTROLLERS,
   providers: [
     AccessTokenVerifier,
-    { provide: ACCESS_CONTROL_MODE_TOKEN, useValue: ACCESS_CONTROL_MODE },
     // Every HTTP route checks the user access token, unless it is marked
     // with @SkipUserAccessCheck() (ADR-0001)
     { provide: APP_GUARD, useClass: UserAccessGuard },

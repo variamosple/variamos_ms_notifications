@@ -4,8 +4,8 @@ import { Test } from "@nestjs/testing";
 import { SkipThrottle, ThrottlerModule } from "@nestjs/throttler";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ACCESS_CONTROL_MODE_TOKEN } from "./AccessControlMode.js";
 import { AccessTokenVerifier } from "./AccessTokenVerifier.js";
+import { SkipUserAccessCheck } from "./SkipUserAccessCheck.js";
 import { UserAccessGuard } from "./UserAccessGuard.js";
 import {
   RATE_LIMIT,
@@ -22,6 +22,13 @@ class LimitedController {
   @Get("free")
   @SkipThrottle()
   public free() {
+    return "ok";
+  }
+
+  // As the health check: no user, so the limit is per client address
+  @Get("public")
+  @SkipUserAccessCheck()
+  public open() {
     return "ok";
   }
 }
@@ -41,7 +48,6 @@ describe("UserAwareThrottlerGuard", () => {
       controllers: [LimitedController],
       providers: [
         { provide: AccessTokenVerifier, useValue: verifier },
-        { provide: ACCESS_CONTROL_MODE_TOKEN, useValue: "observe" },
         { provide: APP_GUARD, useClass: UserAccessGuard },
         { provide: APP_GUARD, useClass: UserAwareThrottlerGuard },
       ],
@@ -65,9 +71,9 @@ describe("UserAwareThrottlerGuard", () => {
   });
 
   it("answers 429 with Retry-After above the limit", async () => {
-    for (let i = 0; i < 3; i++) await call().expect(200);
+    for (let i = 0; i < 3; i++) await call("/limited", "token-a").expect(200);
 
-    const response = await call().expect(429);
+    const response = await call("/limited", "token-a").expect(429);
 
     expect(Number(response.headers["retry-after"])).toBeGreaterThan(0);
   });
@@ -84,10 +90,19 @@ describe("UserAwareThrottlerGuard", () => {
     expect(statusOfB).toBe(200);
   });
 
+  it("counts a route without a user by client address", async () => {
+    const statuses: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      statuses.push((await call("/limited/public")).status);
+    }
+
+    expect(statuses).toEqual([200, 200, 200, 429]);
+  });
+
   it("does not limit a route marked @SkipThrottle()", async () => {
     const statuses: number[] = [];
     for (let i = 0; i < 5; i++) {
-      statuses.push((await call("/limited/free")).status);
+      statuses.push((await call("/limited/free", "token-a")).status);
     }
 
     expect(statuses).toEqual([200, 200, 200, 200, 200]);

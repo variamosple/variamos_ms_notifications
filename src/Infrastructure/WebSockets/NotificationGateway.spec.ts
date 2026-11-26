@@ -4,7 +4,6 @@ import { Logger } from "@nestjs/common";
 import type { Server, Socket } from "socket.io";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Notification } from "../../Domain/Entities/Notification.js";
-import type { AccessControlMode } from "../Auth/AccessControlMode.js";
 import type { AccessTokenVerifier } from "../Auth/AccessTokenVerifier.js";
 import {
   NotificationGateway,
@@ -12,9 +11,9 @@ import {
 } from "./NotificationGateway.js";
 
 /**
- * Characterization tests (EV-110 lot 1): they pin how both gateways accept
- * connections and route events today, before the handshake is authenticated
- * (EV-68). The sockets and servers are fakes: no network is used.
+ * How both gateways accept connections and route events (EV-110, EV-68):
+ * a client joins the room of its access token's user, never a userId it
+ * gives (TRV-66). The sockets and servers are fakes: no network is used.
  */
 const fakeSocket = (handshake: {
   auth?: Record<string, unknown>;
@@ -50,10 +49,8 @@ const verifier = {
   ),
 } as unknown as AccessTokenVerifier;
 
-const rootGateway = (mode: AccessControlMode = "observe") =>
-  new RootNotificationGateway(verifier, mode);
-const namespaceGateway = (mode: AccessControlMode = "observe") =>
-  new NotificationGateway(rootGateway(mode), verifier, mode);
+const rootGateway = () => new RootNotificationGateway(verifier);
+const namespaceGateway = () => new NotificationGateway(rootGateway(), verifier);
 
 const setServer = (gateway: object, server: Server) => {
   (gateway as { server: Server }).server = server;
@@ -85,7 +82,7 @@ describe.each([
     vi.restoreAllMocks();
   });
 
-  it("disconnects a client that gives no userId", async () => {
+  it("disconnects a client without a token", async () => {
     const client = fakeSocket({});
 
     await createGateway().handleConnection(client);
@@ -94,59 +91,89 @@ describe.each([
     expect(client.join).not.toHaveBeenCalled();
   });
 
-  it("disconnects a client whose userId is blank", async () => {
-    const client = fakeSocket({ auth: { userId: "   " } });
+  it.each([
+    ["the handshake auth", { auth: { userId: "user-1" } }],
+    ["the query", { query: { userId: "user-1" } }],
+    ["the query, as a list", { query: { userId: ["user-1", "user-2"] } }],
+  ])(
+    "disconnects a client that only gives a userId in %s",
+    async (_where, handshake) => {
+      const client = fakeSocket(handshake);
 
-    await createGateway().handleConnection(client);
+      await createGateway().handleConnection(client);
 
-    expect(client.disconnect).toHaveBeenCalledWith(true);
-  });
+      expect(client.disconnect).toHaveBeenCalledWith(true);
+      expect(client.join).not.toHaveBeenCalled();
+    },
+  );
 
-  it("joins the room of the userId given in the handshake auth", async () => {
-    const client = fakeSocket({ auth: { userId: " user-1 " } });
-
-    await createGateway().handleConnection(client);
-
-    expect(client.join).toHaveBeenCalledWith("user-1");
-    expect(client.disconnect).not.toHaveBeenCalled();
-  });
-
-  it("falls back to the userId of the query, first value only", async () => {
-    const client = fakeSocket({ query: { userId: ["user-2", "user-3"] } });
-
-    await createGateway().handleConnection(client);
-
-    expect(client.join).toHaveBeenCalledWith("user-2");
-  });
-
-  it("joins the room of the token's user, ignoring the userId given", async () => {
-    const client = fakeSocket({
-      auth: { token: "valid-token", userId: "someone-else" },
-    });
-
-    await createGateway().handleConnection(client);
-
-    expect(client.join).toHaveBeenCalledWith("user-from-token");
-    expect(client.join).not.toHaveBeenCalledWith("someone-else");
-  });
-
-  it("in enforce mode, refuses a client without a valid token even with a userId", async () => {
+  it("disconnects a client with a forged token, even with a userId", async () => {
     const client = fakeSocket({
       auth: { token: "forged-token", userId: "user-1" },
     });
 
-    await createGateway("enforce").handleConnection(client);
+    await createGateway().handleConnection(client);
 
     expect(client.disconnect).toHaveBeenCalledWith(true);
     expect(client.join).not.toHaveBeenCalled();
   });
 
-  it("in enforce mode, accepts a client with a valid token", async () => {
+  it("disconnects a client whose token is not a string", async () => {
+    const client = fakeSocket({ auth: { token: ["valid-token"] } });
+
+    await createGateway().handleConnection(client);
+
+    expect(client.disconnect).toHaveBeenCalledWith(true);
+  });
+
+  it("accepts a client with a valid token", async () => {
     const client = fakeSocket({ auth: { token: "valid-token" } });
 
-    await createGateway("enforce").handleConnection(client);
+    await createGateway().handleConnection(client);
 
     expect(client.join).toHaveBeenCalledWith("user-from-token");
+    expect(client.disconnect).not.toHaveBeenCalled();
+  });
+
+  it("joins the room of the token's user, ignoring the userId given", async () => {
+    const client = fakeSocket({
+      auth: { token: "valid-token", userId: "someone-else" },
+      query: { userId: "someone-else" },
+    });
+
+    await createGateway().handleConnection(client);
+
+    expect(client.join).toHaveBeenCalledOnce();
+    expect(client.join).toHaveBeenCalledWith("user-from-token");
+  });
+
+  it("logs the disconnection under the token's user, not the userId given", async () => {
+    const log = vi.mocked(Logger.prototype.log);
+    const client = fakeSocket({
+      auth: { token: "valid-token", userId: "someone-else" },
+    });
+    const gateway = createGateway();
+    await gateway.handleConnection(client);
+    log.mockClear();
+
+    gateway.handleDisconnect(client);
+
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining("disconnected: userId=user-from-token"),
+    );
+    expect(JSON.stringify(log.mock.calls)).not.toContain("someone-else");
+  });
+
+  it("logs nothing when a refused client disconnects", async () => {
+    const log = vi.mocked(Logger.prototype.log);
+    const client = fakeSocket({ auth: { userId: "user-1" } });
+    const gateway = createGateway();
+    await gateway.handleConnection(client);
+    log.mockClear();
+
+    gateway.handleDisconnect(client);
+
+    expect(log).not.toHaveBeenCalled();
   });
 });
 
@@ -168,7 +195,7 @@ describe.each([
   it("closes the connection when the token expires, not before", async () => {
     const client = fakeSocket({ auth: { token: "valid-token" } });
 
-    await createGateway("enforce").handleConnection(client);
+    await createGateway().handleConnection(client);
     vi.advanceTimersByTime(59_999);
     expect(client.conn.close).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
@@ -180,7 +207,7 @@ describe.each([
 
   it("forgets the end of a socket that disconnects first", async () => {
     const client = fakeSocket({ auth: { token: "valid-token" } });
-    const gateway = createGateway("enforce");
+    const gateway = createGateway();
 
     await gateway.handleConnection(client);
     gateway.handleDisconnect(client);
@@ -189,20 +216,12 @@ describe.each([
     expect(client.conn.close).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
   });
-
-  it("sets no end for a client of observe mode, which has no token", async () => {
-    const client = fakeSocket({ auth: { userId: "user-1" } });
-
-    await createGateway("observe").handleConnection(client);
-
-    expect(vi.getTimerCount()).toBe(0);
-  });
 });
 
 describe("NotificationGateway.send", () => {
   it("emits a reduced payload to the recipient's room on both namespaces", async () => {
     const root = rootGateway();
-    const gateway = new NotificationGateway(root, verifier, "observe");
+    const gateway = new NotificationGateway(root, verifier);
     const namespace = fakeServer();
     const rootServer = fakeServer();
     setServer(gateway, namespace.server);

@@ -1,17 +1,11 @@
 import {
   type CanActivate,
   type ExecutionContext,
-  Inject,
   Injectable,
-  Logger,
   UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import type { Principal } from "../../Domain/Entities/Principal.js";
-import {
-  ACCESS_CONTROL_MODE_TOKEN,
-  type AccessControlMode,
-} from "./AccessControlMode.js";
 import { AccessTokenVerifier, bearerToken } from "./AccessTokenVerifier.js";
 import { SKIP_USER_ACCESS_CHECK } from "./SkipUserAccessCheck.js";
 
@@ -23,19 +17,15 @@ export interface RequestWithPrincipal {
 }
 
 /**
- * Global guard: attaches the verified user to the request. Without a valid
- * token, the request is refused in "enforce" mode and only logged in
- * "observe" mode.
+ * Global guard: attaches the verified user to the request, and refuses a
+ * request without a valid access token (ADR-0001). The recipient of a user
+ * route is always this user, never a parameter of the request (TRV-66).
  */
 @Injectable()
 export class UserAccessGuard implements CanActivate {
-  private readonly logger = new Logger(UserAccessGuard.name);
-
   constructor(
     private readonly reflector: Reflector,
     private readonly verifier: AccessTokenVerifier,
-    @Inject(ACCESS_CONTROL_MODE_TOKEN)
-    private readonly mode: AccessControlMode,
   ) {}
 
   public async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -49,18 +39,12 @@ export class UserAccessGuard implements CanActivate {
     const principal = await this.verifier.verify(
       bearerToken(request.headers.authorization),
     );
-    if (principal) {
-      request.principal = principal;
-      return true;
-    }
-    if (this.mode === "enforce") {
+    if (!principal) {
       throw new UnauthorizedException(
         "A valid notification access token is required.",
       );
     }
-    this.logger.warn(
-      `Observe mode: ${request.method} ${request.path ?? ""} without a valid access token`,
-    );
+    request.principal = principal;
     return true;
   }
 }

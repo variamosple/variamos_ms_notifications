@@ -21,12 +21,7 @@ import { MarkAsReadUseCase } from "../../UseCases/MarkAsReadUseCase.js";
 import { SendNotificationUseCase } from "../../UseCases/SendNotificationUseCase.js";
 import { CurrentPrincipal } from "../Auth/CurrentPrincipal.js";
 import { SkipUserAccessCheck } from "../Auth/SkipUserAccessCheck.js";
-import {
-  type InboxQuery,
-  InboxQuerySchema,
-  type RecipientQuery,
-  RecipientQuerySchema,
-} from "../DTOs/QueryDtos.js";
+import { type InboxQuery, InboxQuerySchema } from "../DTOs/QueryDtos.js";
 import { toNotificationResponse } from "../DTOs/Responses.js";
 import type { SendNotificationDto } from "../DTOs/SendNotificationDto.js";
 import { SendNotificationSchema } from "../DTOs/SendNotificationDto.js";
@@ -34,7 +29,6 @@ import { DomainErrorFilter } from "../Filters/DomainErrorFilter.js";
 import { NotificationInternalGuard } from "../Guards/NotificationInternalGuard.js";
 import { ZodQueryPipe } from "../Pipes/ZodQueryPipe.js";
 import { ZodValidationPipe } from "../Pipes/ZodValidationPipe.js";
-import { recipientOf } from "./recipientOf.js";
 
 /** Sending notifications, and the inbox of a user: reading and marking them. */
 @Controller("notifications")
@@ -68,11 +62,11 @@ export class NotificationController {
 
   @Get()
   public async getInbox(
-    @CurrentPrincipal() principal: Principal | undefined,
+    @CurrentPrincipal() principal: Principal,
     @Query(new ZodQueryPipe(InboxQuerySchema)) query: InboxQuery,
   ) {
     const notifications = await this.getInboxUseCase.execute({
-      recipientId: recipientOf(principal, query.recipientId),
+      recipientId: principal.userId,
       page: query.page,
       limit: query.limit,
       folder: query.folder,
@@ -82,7 +76,7 @@ export class NotificationController {
 
   @Patch(":id/read")
   public async markAsRead(
-    @CurrentPrincipal() principal: Principal | undefined,
+    @CurrentPrincipal() principal: Principal,
     @Param("id", new ParseUUIDPipe()) id: string,
   ) {
     return toNotificationResponse(
@@ -92,12 +86,7 @@ export class NotificationController {
 
   @Patch("read-all")
   @HttpCode(HttpStatus.NO_CONTENT)
-  public async markAllAsRead(
-    @CurrentPrincipal() principal: Principal | undefined,
-    @Query(new ZodQueryPipe(RecipientQuerySchema)) query: RecipientQuery,
-  ) {
-    await this.markAllAsReadUseCase.execute(
-      recipientOf(principal, query.recipientId),
-    );
+  public async markAllAsRead(@CurrentPrincipal() principal: Principal) {
+    await this.markAllAsReadUseCase.execute(principal.userId);
   }
 }

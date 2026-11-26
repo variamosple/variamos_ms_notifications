@@ -8,12 +8,12 @@ export class RestoreNotificationUseCase {
   constructor(private readonly notificationRepo: INotificationRepository) {}
 
   /**
-   * With an actor, only the actor's own notification can be restored; any
-   * other one answers "not found".
+   * Only the actor's own notification can be restored; any other one
+   * answers "not found", so that its existence is not told.
    */
-  public async execute(id: string, actor?: Principal): Promise<Notification> {
+  public async execute(id: string, actor: Principal): Promise<Notification> {
     const notification = await this.notificationRepo.findById(id);
-    if (!notification || (actor && !notification.belongsTo(actor.userId))) {
+    if (!notification?.belongsTo(actor.userId)) {
       throw new NotificationNotFoundError(id);
     }
     notification.restoreFromTrash();
