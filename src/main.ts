@@ -8,7 +8,7 @@ import { validateEnv } from "./Infrastructure/Config/env.config.js";
 import { prepareDatabase } from "./Infrastructure/Persistence/TypeORM/prepareDatabase.js";
 
 async function bootstrap(): Promise<void> {
-  validateEnv();
+  const config = validateEnv();
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   // No request is served on a schema that failed to migrate
   await prepareDatabase(
@@ -17,7 +17,7 @@ async function bootstrap(): Promise<void> {
     new Logger("Database"),
   );
   configureApplication(app);
-  await app.listen(process.env.PORT ?? 3000, "0.0.0.0");
+  await app.listen(config.PORT, "0.0.0.0");
 }
 
 // A service that cannot start stops, with the reason in its log

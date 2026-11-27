@@ -34,6 +34,8 @@ DATABASE_SSL=false
 NOTIFICATION_INTERNAL_TOKEN=your-shared-secret-token
 ```
 
+The service reads its database connection from these variables only: it has no built-in host or credentials. With `NODE_ENV=production` it refuses to start without the internal token and the database host, user, password and name, and on a port that is not a whole number from 1 to 65535. An empty port or schema takes its default (3000, 5432, `variamos`). An internal token shorter than 32 characters is only a warning in production for now: it will be refused once the secrets are renewed. With `DATABASE_SSL=true`, the database certificate must be one Node trusts.
+
 Outside production, the service does not migrate a remote database, nor the production database reached through a tunnel: the production database carries the setting `variamos.environment = 'production'`. `ALLOW_AUTOMATIC_WRITES_ON_REMOTE_DATABASE=true` allows the migrations anyway.
 
 ---
