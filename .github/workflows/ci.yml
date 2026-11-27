@@ -89,6 +89,36 @@ jobs:
       run: |
         bash scripts/scan-image.sh image-to-check
 
+    # The image must refuse to start on a configuration it cannot run with,
+    # and run on a complete one (EV-45). Placeholder values only.
+    - name: Run the container smoke test
+      run: |
+        # Without its secrets, in production
+        code=0; timeout 60 docker run --rm -e NODE_ENV=production image-to-check || code=$?
+        if [ "$code" -ne 1 ]; then
+          echo "Error: without its secrets, the container must stop with code 1 (got $code)"
+          exit 1
+        fi
+        placeholders=(-e NODE_ENV=production -e DATABASE_HOST=db
+          -e DATABASE_USERNAME=ci -e DATABASE_PASSWORD=ci -e DATABASE_NAME=ci
+          -e NOTIFICATION_INTERNAL_TOKEN=ci-placeholder-token-of-32-characters)
+        # With a port out of range
+        code=0; timeout 60 docker run --rm "${placeholders[@]}" -e DATABASE_PORT=70000 image-to-check || code=$?
+        if [ "$code" -ne 1 ]; then
+          echo "Error: with a malformed port, the container must stop with code 1 (got $code)"
+          exit 1
+        fi
+        # With placeholder values, it must keep running (it waits for the database)
+        docker run -d --name test-app "${placeholders[@]}" image-to-check
+        sleep 5
+        if [ "$(docker inspect -f '{{.State.Running}}' test-app)" != "true" ]; then
+          echo "Error: the container stopped on a complete configuration"
+          docker logs test-app
+          exit 1
+        fi
+        docker stop test-app
+        docker rm test-app
+
     - name: Verify production build
       run: |
         npm run build
