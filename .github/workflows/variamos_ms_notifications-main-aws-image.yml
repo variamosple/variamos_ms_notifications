@@ -10,8 +10,7 @@ on:
       - main
   workflow_dispatch:
 
-# One deployment at a time: the rollback puts back the image in service when
-# the run started, which must not be the one another run is deploying. A run
+# One deployment at a time (bin/deploy also holds a lock on the server). A run
 # waits for the one in progress; a newer push replaces a run still waiting.
 concurrency:
   group: ${{ github.workflow }}
@@ -20,6 +19,9 @@ concurrency:
 jobs:
   build:
     runs-on: "ubuntu-latest"
+    # The deploy key, its account and the host key live in this environment,
+    # limited to main (ADR-0004)
+    environment: production
 
     steps:
       - uses: actions/checkout@v7
@@ -59,35 +61,47 @@ jobs:
           docker tag image-to-check "$IMAGE"
           docker push "$IMAGE"
 
-      - name: Record the deployment start
-        run: echo "DEPLOY_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
-
+      # One SSH call. The deploy key of this repository can only run
+      # "deploy SERVICE" on the server (forced command, variamos_server
+      # bin/deploy): it pulls the image, recreates the service, waits until
+      # it is healthy and otherwise puts back the previous image. The
+      # rollback is the one of bin/deploy. This repository sends no value:
+      # its token, shared with the admin, and its port stay on the server
+      # (ADR-0004).
       - name: Deploy changes into the server
-        uses: appleboy/ssh-action@c4f70287fc37c43b14b30b407224bbbc8e8c6327 # master of 2026-08-16: v1.2.5 plus the drone-ssh checksum check
-        with:
-          host: ${{ secrets.AWS_HOST }}
-          username: ${{ secrets.AWS_USERNAME }}
-          key: ${{ secrets.VARIAMOS_AWS_PEM }}
-          script: |
-            echo "Injecting GitHub Secrets into environment..."
-            sed -i -E '/^(VARIAMOS_MS_NOTIFICATIONS_PORT|VARIAMOS_MS_NOTIFICATIONS_INTERNAL_PORT|NOTIFICATION_INTERNAL_TOKEN)=/d' .env.aws.develop
-            echo "VARIAMOS_MS_NOTIFICATIONS_PORT=\"${{ vars.VARIAMOS_MS_NOTIFICATIONS_PORT }}\"" >> .env.aws.develop
-            echo "VARIAMOS_MS_NOTIFICATIONS_INTERNAL_PORT=\"${{ vars.VARIAMOS_MS_NOTIFICATIONS_INTERNAL_PORT }}\"" >> .env.aws.develop
-            echo "NOTIFICATION_INTERNAL_TOKEN=\"${{ secrets.NOTIFICATION_INTERNAL_TOKEN }}\"" >> .env.aws.develop
+        env:
+          SSH_HOST: ${{ secrets.AWS_HOST }}
+          SSH_USER: ${{ secrets.AWS_USERNAME }}
+          SSH_KEY: ${{ secrets.VARIAMOS_AWS_PEM }}
+          SSH_HOST_KEY: ${{ vars.VARIAMOS_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          # Only the deploy account has the forced command: with another one,
+          # the values would reach a shell
+          if [ "$SSH_USER" != deploy ]; then
+            echo "::error::AWS_USERNAME must be deploy (environment production)"
+            exit 1
+          fi
+          if [ -z "$SSH_HOST_KEY" ]; then
+            echo "::error::VARIAMOS_SSH_KNOWN_HOSTS is not set (environment production)"
+            exit 1
+          fi
+          d=$(mktemp -d)
+          trap 'rm -rf "$d"' EXIT
+          printf '%s\n' "$SSH_KEY" > "$d/key"
+          chmod 600 "$d/key"
+          # The host key is checked: no address in the file, an alias instead
+          printf 'variamos-production %s\n' "$SSH_HOST_KEY" > "$d/known_hosts"
+          ssh -i "$d/key" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o HostKeyAlias=variamos-production \
+            -o UserKnownHostsFile="$d/known_hosts" -o StrictHostKeyChecking=yes \
+            -o ServerAliveInterval=30 "$SSH_USER@$SSH_HOST" \
+            sudo /opt/variamos/bin/deploy variamos_ms_notifications < /dev/null
 
-            echo "Executing command on remote server..."
-            # Keep the image in service: the rollback step puts it back (D6)
-            previous=$(docker inspect -f '{{.Image}}' "$(docker compose --env-file .env.aws.develop -f docker-compose-aws-develop-nginx.yml ps -q variamos_ms_notifications)" 2>/dev/null || true)
-            if [ -n "$previous" ]; then docker tag "$previous" variamos_ms_notifications:rollback; fi
-            docker compose --env-file .env.aws.develop -f docker-compose-aws-develop-nginx.yml pull variamos_ms_notifications
-            docker compose --env-file .env.aws.develop -f docker-compose-aws-develop-nginx.yml up -d --force-recreate variamos_ms_notifications
-            docker image prune -f
-
-      # The new container must answer the /health contract with UP, and have
-      # started after the deployment began. Otherwise the previous image is
-      # put back and the run stays red (T-25, decision D6).
+      # bin/deploy already waited for a healthy container; this checks the
+      # public route through nginx. A failure here leaves the run red without
+      # rollback: the container is healthy, look at nginx first.
       - name: Check the deployed service answers
-        id: health
         env:
           HEALTH_URL: https://app.variamos.com/variamos_ms_notifications/health
           SERVICE_NAME: variamos_ms_notifications
@@ -95,61 +109,15 @@ jobs:
           deadline=$(( $(date +%s) + 300 ))
           while :; do
             body=$(curl -sS --max-time 10 "$HEALTH_URL" || true)
-            # A container left from before this deployment has a longer uptime
-            max_uptime=$(( $(date +%s) - DEPLOY_STARTED_AT + 60 ))
-            if echo "$body" | jq -e --arg name "$SERVICE_NAME" --argjson max "$max_uptime" \
-              '.serviceName == $name and .status == "UP" and .uptimeSeconds <= $max' >/dev/null 2>&1; then
+            if echo "$body" | jq -e --arg name "$SERVICE_NAME" \
+              '.serviceName == $name and .status == "UP"' >/dev/null 2>&1; then
               echo "$SERVICE_NAME is UP: $(echo "$body" | jq -c '{status, version, uptimeSeconds}')"
               exit 0
             fi
             if [ "$(date +%s)" -ge "$deadline" ]; then
-              echo "::error::$SERVICE_NAME did not answer UP from the new container within 5 minutes"
+              echo "::error::$SERVICE_NAME did not answer UP through nginx within 5 minutes"
               echo "Last answer: $(echo "$body" | head -c 500)"
               exit 1
             fi
             sleep 10
           done
-
-      # A migration is not undone: the previous code must accept the schema
-      # left by the new one, as every migration so far does
-      - name: Roll back to the previous image
-        id: rollback
-        if: failure() && steps.health.outcome == 'failure'
-        uses: appleboy/ssh-action@c4f70287fc37c43b14b30b407224bbbc8e8c6327 # master of 2026-08-16: v1.2.5 plus the drone-ssh checksum check
-        with:
-          host: ${{ secrets.AWS_HOST }}
-          username: ${{ secrets.AWS_USERNAME }}
-          key: ${{ secrets.VARIAMOS_AWS_PEM }}
-          script: |
-            set -e
-            # -a: a container that stopped after a crash is not listed otherwise
-            container=$(docker compose --env-file .env.aws.develop -f docker-compose-aws-develop-nginx.yml ps -a -q variamos_ms_notifications)
-            if ! docker image inspect variamos_ms_notifications:rollback >/dev/null 2>&1; then
-              echo "No previous image kept: nothing to roll back to"
-              exit 1
-            fi
-            if [ "$(docker inspect -f '{{.Image}}' "$container")" = "$(docker image inspect -f '{{.Id}}' variamos_ms_notifications:rollback)" ]; then
-              echo "The service still runs the previous image: nothing was rolled back"
-              exit 1
-            fi
-            # The compose file names the image: that name points back to the previous one
-            docker tag variamos_ms_notifications:rollback "$(docker inspect -f '{{.Config.Image}}' "$container")"
-            docker compose --env-file .env.aws.develop -f docker-compose-aws-develop-nginx.yml up -d --force-recreate --pull never variamos_ms_notifications
-            echo "Rolled back to the previous image"
-
-      - name: Check the rolled back service answers
-        if: failure() && steps.rollback.outcome == 'success'
-        env:
-          HEALTH_URL: https://app.variamos.com/variamos_ms_notifications/health
-          SERVICE_NAME: variamos_ms_notifications
-        run: |
-          deadline=$(( $(date +%s) + 300 ))
-          until curl -sS --max-time 10 "$HEALTH_URL" | jq -e --arg name "$SERVICE_NAME" \
-            '.serviceName == $name and .status == "UP"' >/dev/null 2>&1; do
-            if [ "$(date +%s)" -ge "$deadline" ]; then
-              echo "::error::$SERVICE_NAME does not answer UP after the rollback either"
-              exit 1
-            fi
-            sleep 10
-          done
-          echo "::warning::$SERVICE_NAME was rolled back to the previous image and answers UP"
