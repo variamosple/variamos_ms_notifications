@@ -35,7 +35,9 @@
     "trufflesecurity",
     "knip",
     "vitest",
-    "aquasec"
+    "aquasec",
+    "pipefail",
+    "mktemp"
   ],
   "ignorePaths": [
     "node_modules/**",
